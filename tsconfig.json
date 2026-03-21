@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "CommonJS",
+
+    "rootDir": "./src",
+    "outDir": "./dist",
+
+    "strict": true,
+    "esModuleInterop": true,
+
+    "types": ["node"],
+
+    "skipLibCheck": true,
+  },
+  "exclude": ["node_modules", "dist", "prisma.config.ts"] //O exclude deve ficar fora do compilerOptions
+  
+}
