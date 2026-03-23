@@ -7,14 +7,30 @@ datasource db {
 }
 
 model Usuario {
-  id       Int     @id @default(autoincrement())
-  name     String
-  email    String  @unique
-  password String
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String
   createdAt DateTime @default(now())
+
+  sessoes Sessao[]
 }
-model paciente{
-  id Int @id @default(autoincrement())
-  name String
+
+model Paciente {
+  id    Int    @id @default(autoincrement())
+  name  String
   idade Int
+
+  sessoes Sessao[]
+}
+
+model Sessao {
+  id         Int      @id @default(autoincrement())
+  data       DateTime
+  observacao String?
+  pacienteId Int
+  usuarioId  Int
+
+  paciente Paciente @relation(fields: [pacienteId], references: [id])
+  usuario  Usuario  @relation(fields: [usuarioId], references: [id])
 }
