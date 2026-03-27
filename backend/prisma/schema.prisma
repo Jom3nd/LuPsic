@@ -8,10 +8,10 @@ datasource db {
 
 model Usuario {
   id        Int      @id @default(autoincrement())
-  name      String
+  nome      String
   email     String   @unique
-  password  String
-  createdAt DateTime @default(now())
+  senha  String
+  criadoEm DateTime @default(now())
 
   sessoes Sessao[]
 }
@@ -30,6 +30,7 @@ model Sessao {
   observacao String?
   pacienteId Int
   usuarioId  Int
+  dataHoraInicio DateTime @default(now())
 
   paciente Paciente @relation(fields: [pacienteId], references: [id])
   usuario  Usuario  @relation(fields: [usuarioId], references: [id])
