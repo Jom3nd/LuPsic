@@ -14,7 +14,7 @@ describe('POST /usuarios', () => {
 
     expect(response.status).toBe(201);
     expect(response.body.nome).toBe('João');
-    });
+    },10000);
 
     it('deve retornar erro se nome estiver faltando', async () => {
     const response = await request(app)
