@@ -26,8 +26,28 @@ Exemplo:
 
 ```env
 DATABASE_URL="postgresql://usuario:senha@localhost:5432/psicologo"
-OPENAI_API_KEY="sua_api_key"
+OLLAMA_API_URL="http://localhost:11434"
 ```
+
+---
+
+# Instalação da Ollama e modelos
+Baixe a Ollama do site oficial: https://ollama.com
+
+Instale a Ollama no seu sistema.
+
+Faça o download dos modelos que o projeto utiliza:
+
+Llama3 → para análises de texto detalhadas: resumo, relatório, sentimento, plano terapêutico.
+
+Phi3 → para chat e sugestões de perguntas.
+
+Certifique-se de que os modelos estão disponíveis localmente e reconhecidos pela Ollama.
+Você pode listar modelos com:
+```
+ollama list
+```
+
 
 ---
 
@@ -54,8 +74,20 @@ npm run dev
 ```
 
 A API irá iniciar normalmente no servidor configurado.
+Por padrão, os endpoints de IA estão disponíveis em:
 
----
+/ai/resumo → usa Llama3
+
+/ai/relatorio → usa Llama3
+
+/ai/sentimento → usa Llama3
+
+/ai/plano → usa Llama3
+
+/ai/perguntas → usa Phi3
+
+/ai/chat → usa Phi3
+
 
 # Rodar os testes
 
@@ -70,9 +102,6 @@ npm test
 - Cadastro de usuários
 - Cadastro de pacientes
 - Gerenciamento de sessões
-- Integração com assistente de IA
-- Registro de respostas da IA
-- Testes unitários
 - Integração com assistente de IA
 - Registro de respostas da IA
 - Testes unitários
