@@ -1,93 +1,84 @@
-import openai from "../lib/openai";
+import { chamarOllama } from "./ollama.client";
 
-export async function perguntarIA(mensagem: string) {
-    const resposta = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-            { role: "system", content: "Você é um assistente para psicólogos.Atue como um Consultor de Apoio Clínico para Psicólogos. Seu papel é auxiliar na organização de casos, fundamentação teórica e estruturação de intervenções" },
-            { role: "user", content: mensagem }
-    ],
-});
+function escolherModelo(tipo: string) {
+    switch (tipo) {
+        case "chat":
+        case "perguntas":
+            return "phi3";
 
-    return resposta.choices[0].message.content;
-}
-export async function resumirSessao(textoSessao: string) {
-    const prompt = `
-    Resuma a seguinte sessão psicológica de forma profissional e objetiva:
-    ${textoSessao}
-`;
+        case "resumo":
+        case "relatorio":
+        case "sentimento":
+        case "plano":
+            return "llama3";
 
-    return await perguntarIA(prompt);
+        default:
+            return "phi3";
+    }
 }
 
-// 2. Gerar relatório psicológico
-export async function gerarRelatorio(textoSessao: string) {
-    const prompt = `
-    Gere um relatório psicológico profissional baseado na seguinte sessão:
-    ${textoSessao}
+function montarPrompt(tipo: string, texto: string) {
+    let instrucao = "";
 
-    O relatório deve conter:
-    - Resumo
-    - Comportamentos observados
-    - Emoções relatadas
-    - Possíveis intervenções
-    `;
+    switch (tipo) {
+        case "resumo":
+            instrucao = "Faça um resumo clínico da sessão.";
+            break;
 
-    return await perguntarIA(prompt);
-}
+        case "relatorio":
+            instrucao = `
+            Gere um relatório psicológico contendo:
+            - Resumo
+            - Comportamentos observados
+            - Emoções relatadas
+            - Possíveis intervenções
+            `;
+            break;
 
-// 3. Analisar sentimento do paciente
-export async function analisarSentimento(texto: string) {
-    const prompt = `
-    Analise o sentimento do paciente no texto abaixo e diga se é:
-    - Ansiedade
-    - Tristeza
-    - Raiva
-    - Medo
-    - Neutro
+        case "sentimento":
+            instrucao = `
+            Analise o estado emocional do paciente e classifique como:
+            Ansiedade, Tristeza, Raiva, Medo ,Neutro , Alegre.
+            `;
+            break;
+
+        case "perguntas":
+            instrucao = "Sugira perguntas terapêuticas para a próxima sessão.";
+            break;
+
+        case "plano":
+            instrucao = `
+            Crie um plano terapêutico contendo:
+            - Objetivos
+            - Técnicas sugeridas
+            - Exercícios
+            - Frequência das sessões
+            `;
+            break;
+
+        case "chat":
+            instrucao = "Responda como um assistente clínico para psicólogos.";
+            break;
+
+        default:
+            instrucao = "Responda como assistente clínico.";
+    }
+
+    return `
+    Você é um assistente para psicólogos.
+    Atue como um Consultor de Apoio Clínico para Psicólogos.
+    Seu papel é auxiliar na organização de casos, fundamentação teórica e estruturação de intervenções.
+
+    ${instrucao}
 
     Texto:
     ${texto}
     `;
-
-    return await perguntarIA(prompt);
 }
 
-// 4. Sugerir perguntas terapêuticas
-export async function sugerirPerguntas(contexto: string) {
-    const prompt = `
-    Baseado no contexto da sessão abaixo, sugira perguntas terapêuticas que o psicólogo pode fazer na próxima sessão:
+export async function processarIA(tipo: string, texto: string) {
+    const model = escolherModelo(tipo);
+    const prompt = montarPrompt(tipo, texto);
 
-    ${contexto}
-    `;
-
-    return await perguntarIA(prompt);
-}
-
-// 5. Gerar plano terapêutico
-export async function gerarPlanoTerapeutico(contexto: string) {
-    const prompt = `
-    Crie um plano terapêutico com base no caso abaixo:
-
-    ${contexto}
-
-    O plano deve conter:
-    - Objetivos
-    - Técnicas sugeridas
-    - Exercícios
-    - Frequência das sessões
-    `;
-
-    return await perguntarIA(prompt);
-}
-
-// 6. Chat assistente
-export async function chatAssistente(mensagem: string) {
-    const prompt = `
-    Responda como um assistente para psicólogos:
-
-    ${mensagem}
-    `;
-
-    return await perguntarIA(prompt);
+    return await chamarOllama(model, prompt);
 }

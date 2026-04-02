@@ -13,7 +13,8 @@ model Usuario {
   senha    String
   criadoEm DateTime @default(now())
 
-  sessoes Sessao[]
+  sessoes     Sessao[]
+  iaResponses IAResponse[]
 }
 
 model Paciente {
@@ -21,28 +22,39 @@ model Paciente {
   name  String
   idade Int
 
-  sessoes Sessao[]
+  sessoes     Sessao[]
+  iaResponses IAResponse[]
 }
 
 model Sessao {
-  id             Int          @id @default(autoincrement())
+  id             Int      @id @default(autoincrement())
   data           DateTime
   observacao     String?
   pacienteId     Int
   usuarioId      Int
-  dataHoraInicio DateTime     @default(now())
-  iaResponses    IAResponse[]
+  dataHoraInicio DateTime @default(now())
 
   paciente Paciente @relation(fields: [pacienteId], references: [id])
   usuario  Usuario  @relation(fields: [usuarioId], references: [id])
+
+  iaResponses IAResponse[]
 }
 
 model IAResponse {
-  id       Int      @id @default(autoincrement())
-  sessaoId Int
-  sessao   Sessao   @relation(fields: [sessaoId], references: [id])
-  tipo     String // "resumo", "relatorio", "sentimento", "perguntas", "plano", "chat"
+  id Int @id @default(autoincrement())
+
+  tipo     String
+  modelo   String
   prompt   String
   resposta String
+
+  sessaoId   Int?
+  pacienteId Int?
+  usuarioId  Int?
+
   criadoEm DateTime @default(now())
+
+  sessao   Sessao?   @relation(fields: [sessaoId], references: [id])
+  paciente Paciente? @relation(fields: [pacienteId], references: [id])
+  usuario  Usuario?  @relation(fields: [usuarioId], references: [id])
 }

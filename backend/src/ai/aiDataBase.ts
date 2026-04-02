@@ -1,20 +1,47 @@
 import prisma from "../lib/prisma";
-import { chatAssistente } from "./ai.service";
+import { processarIA } from "./ai.service";
 
 // Cria resposta da IA e salva no banco
-export async function criarRespostaIA(sessaoId: number, tipo: string, mensagem: string) {
-  // 1. Chama o chat da IA
-    const respostaIA = await chatAssistente(mensagem);
+export async function criarRespostaIA(
+    tipo: string,
+    texto: string,
+    sessaoId?: number,
+    pacienteId?: number,
+    usuarioId?: number
+) {
+    // 1. Processa IA (já escolhe modelo e prompt)
+    const respostaIA = await processarIA(tipo, texto);
 
-  // 2. Salva no banco
+    // 2. Descobre qual modelo foi usado (opcional)
+    let modelo = "phi3";
+    if (["resumo", "relatorio", "sentimento", "plano"].includes(tipo)) {
+        modelo = "llama3";
+    }
+
+    // 3. Salva no banco
     const registro = await prisma.iAResponse.create({
         data: {
-        sessaoId,
-        tipo,
-        prompt: mensagem,
-        resposta: respostaIA as string, // Asserção de tipo para garantir que respostaIA não seja nula
-    },
-});
+            tipo,
+            modelo,
+            prompt: texto,
+            resposta: respostaIA || "",
+            sessaoId,
+            pacienteId,
+            usuarioId
+        },
+    });
 
     return registro;
+}
+
+// Buscar respostas da IA por sessão
+export async function buscarRespostasPorSessao(sessaoId: number) {
+    return await prisma.iAResponse.findMany({
+        where: {
+            sessaoId: sessaoId,
+        },
+        orderBy: {
+            criadoEm: "desc",
+        },
+    });
 }
