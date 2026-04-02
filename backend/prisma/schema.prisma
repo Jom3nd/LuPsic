@@ -7,14 +7,42 @@ datasource db {
 }
 
 model Usuario {
-  id       Int     @id @default(autoincrement())
-  name     String
-  email    String  @unique
-  password String
-  createdAt DateTime @default(now())
+  id       Int      @id @default(autoincrement())
+  nome     String
+  email    String   @unique
+  senha    String
+  criadoEm DateTime @default(now())
+
+  sessoes Sessao[]
 }
-model paciente{
-  id Int @id @default(autoincrement())
-  name String
+
+model Paciente {
+  id    Int    @id @default(autoincrement())
+  name  String
   idade Int
+
+  sessoes Sessao[]
+}
+
+model Sessao {
+  id             Int          @id @default(autoincrement())
+  data           DateTime
+  observacao     String?
+  pacienteId     Int
+  usuarioId      Int
+  dataHoraInicio DateTime     @default(now())
+  iaResponses    IAResponse[]
+
+  paciente Paciente @relation(fields: [pacienteId], references: [id])
+  usuario  Usuario  @relation(fields: [usuarioId], references: [id])
+}
+
+model IAResponse {
+  id       Int      @id @default(autoincrement())
+  sessaoId Int
+  sessao   Sessao   @relation(fields: [sessaoId], references: [id])
+  tipo     String // "resumo", "relatorio", "sentimento", "perguntas", "plano", "chat"
+  prompt   String
+  resposta String
+  criadoEm DateTime @default(now())
 }
