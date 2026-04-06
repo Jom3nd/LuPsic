@@ -1,16 +1,22 @@
-import express from 'express';
-import usuarioRoutes from './usuario/usuario.routes';
-import aiRoutes from './ai/ai.routes';
-import sessaoRoutes from './sessao/sessao.routes';
-import pacienteRoutes from './paciente/paciente.routes';
+import express from 'express'
+import cors from 'cors'
 
-const app = express();
-app.use(express.json());
+import usuarioRoutes from './usuario/usuario.routes'
+import aiRoutes from './ai/ai.routes'
+import sessaoRoutes from './sessao/sessao.routes'
+import pacienteRoutes from './paciente/paciente.routes'
 
-app.use('/usuarios', usuarioRoutes);
-app.use("/ai", aiRoutes);
-app.use("/sessao",sessaoRoutes);
-app.use("/paciente", pacienteRoutes);
+const app = express()
 
+app.use(cors({
+    origin: 'http://localhost:5173'
+}))
 
-export default app;
+app.use(express.json())
+
+app.use('/usuario', usuarioRoutes)
+app.use('/ai', aiRoutes)
+app.use('/sessao', sessaoRoutes)
+app.use('/paciente', pacienteRoutes)
+
+export default app
