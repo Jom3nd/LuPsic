@@ -1,84 +1,113 @@
-import { chamarOllama } from "./ollama.client";
+import { chamarOllamaComIA } from "./ollama.client";
+import { tools, toolMap, validarTool } from "./ai.tools";
 
-function escolherModelo(tipo: string) {
-    switch (tipo) {
-        case "chat":
-        case "perguntas":
-            return "phi3";
-
-        case "resumo":
-        case "relatorio":
-        case "sentimento":
-        case "plano":
-            return "llama3";
-
-        default:
-            return "phi3";
-    }
-}
-
-function montarPrompt(tipo: string, texto: string) {
-    let instrucao = "";
-
-    switch (tipo) {
-        case "resumo":
-            instrucao = "Faça um resumo clínico da sessão.";
-            break;
-
-        case "relatorio":
-            instrucao = `
-            Gere um relatório psicológico contendo:
-            - Resumo
-            - Comportamentos observados
-            - Emoções relatadas
-            - Possíveis intervenções
-            `;
-            break;
-
-        case "sentimento":
-            instrucao = `
-            Analise o estado emocional do paciente e classifique como:
-            Ansiedade, Tristeza, Raiva, Medo ,Neutro , Alegre.
-            `;
-            break;
-
-        case "perguntas":
-            instrucao = "Sugira perguntas terapêuticas para a próxima sessão.";
-            break;
-
-        case "plano":
-            instrucao = `
-            Crie um plano terapêutico contendo:
-            - Objetivos
-            - Técnicas sugeridas
-            - Exercícios
-            - Frequência das sessões
-            `;
-            break;
-
-        case "chat":
-            instrucao = "Responda como um assistente clínico para psicólogos.";
-            break;
-
-        default:
-            instrucao = "Responda como assistente clínico.";
-    }
-
+function gerarPromptInterpretacao(mensagem: string) {
     return `
-    Você é um assistente para psicólogos.
-    Atue como um Consultor de Apoio Clínico para Psicólogos.
-    Seu papel é auxiliar na organização de casos, fundamentação teórica e estruturação de intervenções.
+Você é um interpretador de comandos.
 
-    ${instrucao}
+Você pode executar as seguintes ações:
 
-    Texto:
-    ${texto}
-    `;
+${JSON.stringify(tools, null, 2)}
+
+Responda SOMENTE em JSON:
+
+{
+    "action": "nome_da_acao",
+    "data": {}
 }
 
-export async function processarIA(tipo: string, texto: string) {
-    const model = escolherModelo(tipo);
-    const prompt = montarPrompt(tipo, texto);
+Se não for uma ação, responda:
 
-    return await chamarOllama(model, prompt);
+{
+    "action": "responder",
+    "data": {}
+}
+
+Usuário: ${mensagem}
+`;
+}
+
+// interpretação com Phi-3
+async function interpretarComPhi(mensagem: string) {
+    const prompt = gerarPromptInterpretacao(mensagem);
+    return await chamarOllamaComIA("phi3", prompt);
+}
+
+// resposta com LLaMA 3
+async function responderComLlama(mensagem: string) {
+    const prompt = `
+Você é um assistente clínico para psicólogos.
+
+Responda de forma clara, profissional e objetiva.
+
+Mensagem:
+${mensagem}
+`;
+
+    return await chamarOllamaComIA("llama3", prompt);
+}
+
+// executar ação com segurança
+async function executarAcao(parsed: any) {
+    if (!validarTool(parsed)) {
+    return {
+        tipo: "erro",
+        message: "Parâmetros inválidos",
+    };
+}
+
+    const action = toolMap[parsed.action];
+
+    if (!action) {
+        return {
+        tipo: "erro",
+        message: "Ação não reconhecida",
+    };
+}
+
+    try {
+        return await action(parsed.data);
+    } catch (error: any) {
+    return {
+        tipo: "erro",
+        message: error.message || "Erro ao executar ação",
+        };
+    }
+}
+export async function processarIA(mensagem: string) {
+    // interpretar comando
+    const interpretacao = await interpretarComPhi(mensagem);
+
+    let parsed;
+
+    try {
+        parsed = JSON.parse(interpretacao);
+    } catch {
+    // fallback → resposta direta
+    const resposta = await responderComLlama(mensagem);
+
+    return {
+        tipo: "resposta",
+        conteudo: resposta,
+        };
+    }
+
+  // executar ação (se houver)
+    if (parsed.action && parsed.action !== "responder") {
+    const resultado = await executarAcao(parsed);
+
+    return {
+        tipo: "acao",
+        conteudo: resultado.message,
+        data: resultado.data || null
+    };
+}
+
+  // resposta normal
+    const resposta = await responderComLlama(mensagem);
+
+    return {
+        tipo: "resposta",
+        conteudo: resposta,
+    };
 }

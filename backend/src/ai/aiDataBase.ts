@@ -9,22 +9,24 @@ export async function criarRespostaIA(
     pacienteId?: number,
     usuarioId?: number
 ) {
-    // 1. Processa IA (já escolhe modelo e prompt)
-    const respostaIA = await processarIA(tipo, texto);
+    
+    const respostaIA = await processarIA(texto);
 
-    // 2. Descobre qual modelo foi usado (opcional)
-    let modelo = "phi3";
-    if (["resumo", "relatorio", "sentimento", "plano"].includes(tipo)) {
-        modelo = "llama3";
-    }
+    // evita erro com objeto
+    const respostaFormatada =
+        typeof respostaIA === "string"
+            ? respostaIA
+            : JSON.stringify(respostaIA, null, 2);
 
-    // 3. Salva no banco
+    // modelo híbrido
+    const modelo = "hybrid";
+
     const registro = await prisma.iAResponse.create({
         data: {
             tipo,
             modelo,
             prompt: texto,
-            resposta: respostaIA || "",
+            resposta: respostaFormatada,
             sessaoId,
             pacienteId,
             usuarioId
