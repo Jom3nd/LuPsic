@@ -1,66 +1,71 @@
-// src/tests/controllers/ai.controller.test.ts
-import request from 'supertest';
-import app from '../../app';
+import request from "supertest";
+import app from "../../app";
 
-// Mock completo do módulo Ollama
-jest.mock('../../ai/ollama.client', () => ({
-    chamarOllama: jest.fn().mockResolvedValue("Resposta mockada")
+// Mock do cliente Ollama
+jest.mock("../../ai/ollama.client", () => ({
+    chamarOllamaComIA: jest.fn().mockResolvedValue("Resposta mockada")
 }));
 
-import * as ollamaClient from '../../ai/ollama.client';
+import * as ollamaClient from "../../ai/ollama.client";
 
-describe("Testando endpoints IA e escolha de modelos", () => {
+describe("Testando endpoints IA", () => {
 
     afterEach(() => {
-        jest.resetAllMocks();
+        jest.clearAllMocks();
     });
 
-    it("Resumo deve usar llama3", async () => {
-        await request(app)
+    it("Resumo deve chamar a IA", async () => {
+        const response = await request(app)
         .post("/ai/resumo")
         .send({ texto: "Teste de sessão" });
 
-        expect(ollamaClient.chamarOllama).toHaveBeenCalledWith("llama3", expect.any(String));
+        expect(response.status).toBe(200);
+        expect(ollamaClient.chamarOllamaComIA).toHaveBeenCalled();
     });
 
-    it("Relatório deve usar llama3", async () => {
-        await request(app)
+    it("Relatório deve chamar a IA", async () => {
+        const response = await request(app)
         .post("/ai/relatorio")
         .send({ texto: "Texto da sessão" });
 
-        expect(ollamaClient.chamarOllama).toHaveBeenCalledWith("llama3", expect.any(String));
+        expect(response.status).toBe(200);
+        expect(ollamaClient.chamarOllamaComIA).toHaveBeenCalled();
     });
 
-    it("Sentimento deve usar llama3", async () => {
-    await request(app)
+    it("Sentimento deve chamar a IA", async () => {
+        const response = await request(app)
         .post("/ai/sentimento")
         .send({ texto: "Paciente ansioso" });
 
-    expect(ollamaClient.chamarOllama).toHaveBeenCalledWith("llama3", expect.any(String));
+        expect(response.status).toBe(200);
+        expect(ollamaClient.chamarOllamaComIA).toHaveBeenCalled();
     });
 
-    it("Plano terapêutico deve usar llama3", async () => {
-        await request(app)
+    it("Plano terapêutico deve chamar a IA", async () => {
+        const response = await request(app)
         .post("/ai/plano")
         .send({ texto: "Contexto do paciente" });
 
-    expect(ollamaClient.chamarOllama).toHaveBeenCalledWith("llama3", expect.any(String));
+        expect(response.status).toBe(200);
+        expect(ollamaClient.chamarOllamaComIA).toHaveBeenCalled();
     });
 
-    it("Perguntas deve usar phi3", async () => {
-        await request(app)
+    it("Perguntas deve chamar a IA", async () => {
+        const response = await request(app)
         .post("/ai/perguntas")
         .send({ texto: "Contexto da sessão" });
 
-    expect(ollamaClient.chamarOllama).toHaveBeenCalledWith("phi3", expect.any(String));
+        expect(response.status).toBe(200);
+        expect(ollamaClient.chamarOllamaComIA).toHaveBeenCalled();
     });
 
-    it("Chat deve usar phi3", async () => {
-        await request(app)
-        .post("/ai/chat")
-        .send({ mensagem: "Olá IA!" });
+    it("Chat deve chamar a IA", async () => {
+        const response = await request(app)
+            .post("/ai/chat")
+            .send({ mensagem: "Olá IA!" });
 
-    expect(ollamaClient.chamarOllama).toHaveBeenCalledWith("phi3", expect.any(String));
+        expect(response.status).toBe(200);
+        expect(ollamaClient.chamarOllamaComIA).toHaveBeenCalled();
     });
 
 });
