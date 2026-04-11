@@ -19,8 +19,8 @@ export async function registrarUsuario(nome : string, email: string, senha: stri
     });
     return {
         id : usuario.id,
-        email : usuario.email,
-        senha : usuario.senha
+        nome : usuario.nome,
+        email : usuario.email
     }
 }
 
@@ -37,15 +37,27 @@ export async function login(email: string, senha: string){
     if(!senhaValida){
         throw new Error("Senha incorreta");
     }
+    if (!process.env.JWT_SECRET) {
+        throw new Error("JWT_SECRET não definido no .env");
+    }
 
     const token = jwt.sign(
     {
         id : usuario.id,
         email : usuario.email
 
-    }, process.env.JWT_SECRET || "segredo", {
+    },
+    process.env.JWT_SECRET as string,{
         expiresIn: "1d"
     }
     );
-    return token;
+    
+    return {
+        token,
+        user: {
+            id: usuario.id,
+            nome: usuario.nome,
+            email: usuario.email
+        }
+    };
 }
