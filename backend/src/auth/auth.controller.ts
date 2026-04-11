@@ -23,11 +23,16 @@ export async function login(req: Request, res: Response) {
     try {
         const { email, senha } = req.body;
 
-        const token = await authService.login(email, senha);
+        const data = await authService.login(email, senha);
 
-        return res.json({ token });
+        return res.json({
+            token: data.token,
+            user: data.user
+        });
 
     } catch (error: any) {
-    return res.status(400).json({ error: "Usuário ou senha inválidos" });
+        return res.status(400).json({
+            error: "Usuário ou senha inválidos"
+        });
     }
 }
