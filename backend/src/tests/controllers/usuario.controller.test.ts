@@ -1,11 +1,11 @@
 import request from 'supertest';
 import app from '../../app';
 
-describe('POST /usuarios', () => {
+describe('POST /usuario', () => {
 
     it('deve criar um usuário', async () => {
     const response = await request(app)
-        .post('/usuarios')
+        .post('/usuario')
         .send({
         nome: 'João',
         email: `joao${Date.now()}@email.com`,
@@ -18,7 +18,7 @@ describe('POST /usuarios', () => {
 
     it('deve retornar erro se nome estiver faltando', async () => {
     const response = await request(app)
-        .post('/usuarios')
+        .post('/usuario')
         .send({
             email: 'teste@email.com',
             senha: '123456',
@@ -29,7 +29,7 @@ describe('POST /usuarios', () => {
 
     it('deve retornar erro se email estiver faltando', async () => {
     const response = await request(app)
-        .post('/usuarios')
+        .post('/usuario')
         .send({
         nome: 'Teste',
         senha: '123456',
@@ -40,7 +40,7 @@ describe('POST /usuarios', () => {
 
     it('deve retornar erro se senha estiver faltando', async () => {
     const response = await request(app)
-        .post('/usuarios')
+        .post('/usuario')
         .send({
             nome: 'Teste',
             email: 'teste@email.com',
@@ -52,13 +52,13 @@ describe('POST /usuarios', () => {
     it('deve retornar erro se email já existir', async () => {
     const email = `repetido${Date.now()}@email.com`;
 
-    await request(app).post('/usuarios').send({
+    await request(app).post('/usuario').send({
         nome: 'Teste',
         email,
         senha: '123456',
     });
 
-    const response = await request(app).post('/usuarios').send({
+    const response = await request(app).post('/usuario').send({
         nome: 'Teste',
         email,
         senha: '123456',

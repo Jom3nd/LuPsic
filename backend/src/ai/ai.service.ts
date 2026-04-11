@@ -1,93 +1,113 @@
-import openai from "../lib/openai";
+import { chamarOllamaComIA } from "./ollama.client";
+import { tools, toolMap, validarTool } from "./ai.tools";
 
-export async function perguntarIA(mensagem: string) {
-    const resposta = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-            { role: "system", content: "Você é um assistente para psicólogos.Atue como um Consultor de Apoio Clínico para Psicólogos. Seu papel é auxiliar na organização de casos, fundamentação teórica e estruturação de intervenções" },
-            { role: "user", content: mensagem }
-    ],
-});
+function gerarPromptInterpretacao(mensagem: string) {
+    return `
+Você é um interpretador de comandos.
 
-    return resposta.choices[0].message.content;
+Você pode executar as seguintes ações:
+
+${JSON.stringify(tools, null, 2)}
+
+Responda SOMENTE em JSON:
+
+{
+    "action": "nome_da_acao",
+    "data": {}
 }
-export async function resumirSessao(textoSessao: string) {
+
+Se não for uma ação, responda:
+
+{
+    "action": "responder",
+    "data": {}
+}
+
+Usuário: ${mensagem}
+`;
+}
+
+// interpretação com Phi-3
+async function interpretarComPhi(mensagem: string) {
+    const prompt = gerarPromptInterpretacao(mensagem);
+    return await chamarOllamaComIA("phi3", prompt);
+}
+
+// resposta com LLaMA 3
+async function responderComLlama(mensagem: string) {
     const prompt = `
-    Resuma a seguinte sessão psicológica de forma profissional e objetiva:
-    ${textoSessao}
+Você é um assistente clínico para psicólogos.
+
+Responda de forma clara, profissional e objetiva.
+
+Mensagem:
+${mensagem}
 `;
 
-    return await perguntarIA(prompt);
+    return await chamarOllamaComIA("llama3", prompt);
 }
 
-// 2. Gerar relatório psicológico
-export async function gerarRelatorio(textoSessao: string) {
-    const prompt = `
-    Gere um relatório psicológico profissional baseado na seguinte sessão:
-    ${textoSessao}
-
-    O relatório deve conter:
-    - Resumo
-    - Comportamentos observados
-    - Emoções relatadas
-    - Possíveis intervenções
-    `;
-
-    return await perguntarIA(prompt);
+// executar ação com segurança
+async function executarAcao(parsed: any) {
+    if (!validarTool(parsed)) {
+    return {
+        tipo: "erro",
+        message: "Parâmetros inválidos",
+    };
 }
 
-// 3. Analisar sentimento do paciente
-export async function analisarSentimento(texto: string) {
-    const prompt = `
-    Analise o sentimento do paciente no texto abaixo e diga se é:
-    - Ansiedade
-    - Tristeza
-    - Raiva
-    - Medo
-    - Neutro
+    const action = toolMap[parsed.action];
 
-    Texto:
-    ${texto}
-    `;
-
-    return await perguntarIA(prompt);
+    if (!action) {
+        return {
+        tipo: "erro",
+        message: "Ação não reconhecida",
+    };
 }
 
-// 4. Sugerir perguntas terapêuticas
-export async function sugerirPerguntas(contexto: string) {
-    const prompt = `
-    Baseado no contexto da sessão abaixo, sugira perguntas terapêuticas que o psicólogo pode fazer na próxima sessão:
+    try {
+        return await action(parsed.data);
+    } catch (error: any) {
+    return {
+        tipo: "erro",
+        message: error.message || "Erro ao executar ação",
+        };
+    }
+}
+export async function processarIA(mensagem: string) {
+    // interpretar comando
+    const interpretacao = await interpretarComPhi(mensagem);
 
-    ${contexto}
-    `;
+    let parsed;
 
-    return await perguntarIA(prompt);
+    try {
+        parsed = JSON.parse(interpretacao);
+    } catch {
+    // fallback → resposta direta
+    const resposta = await responderComLlama(mensagem);
+
+    return {
+        tipo: "resposta",
+        conteudo: resposta,
+        };
+    }
+
+  // executar ação (se houver)
+    if (parsed.action && parsed.action !== "responder") {
+    const resultado = await executarAcao(parsed);
+
+    return {
+        tipo: "acao",
+        conteudo: resultado.message,
+        data: resultado.data || null
+    };
 }
 
-// 5. Gerar plano terapêutico
-export async function gerarPlanoTerapeutico(contexto: string) {
-    const prompt = `
-    Crie um plano terapêutico com base no caso abaixo:
+  // resposta normal
+    const resposta = await responderComLlama(mensagem);
 
-    ${contexto}
-
-    O plano deve conter:
-    - Objetivos
-    - Técnicas sugeridas
-    - Exercícios
-    - Frequência das sessões
-    `;
-
-    return await perguntarIA(prompt);
-}
-
-// 6. Chat assistente
-export async function chatAssistente(mensagem: string) {
-    const prompt = `
-    Responda como um assistente para psicólogos:
-
-    ${mensagem}
-    `;
-
-    return await perguntarIA(prompt);
+    return {
+        tipo: "resposta",
+        conteudo: resposta,
+    };
 }

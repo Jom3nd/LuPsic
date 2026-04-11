@@ -1,50 +1,57 @@
-import {Request, Response} from 'express';
-import{ gerarPlanoTerapeutico, gerarRelatorio, resumirSessao, analisarSentimento, sugerirPerguntas, chatAssistente } from "./ai.service";
-import {perguntarIA} from "./ai.service";
+import { Request, Response } from "express";
+import { processarIA } from "./ai.service";
 
-export async function chatAI(req: Request, res: Response) {
 
-    try {
-        const {mensagem} = req.body;
-        await perguntarIA(mensagem);
-        res.status(201).json({ resposta: "Resposta da IA enviada com sucesso!" });
-
-    } catch (error) {
-        res.status(500).json({ error: "Erro ao enviar mensagem para IA" });
-    }
+function formatarResposta(respostaIA: any) {
+    return typeof respostaIA === "string"
+        ? respostaIA
+        : JSON.stringify(respostaIA, null, 2);
 }
+
 export async function resumo(req: Request, res: Response) {
     const { texto } = req.body;
-    const resposta = await resumirSessao(texto);
-    res.status(201).json({ resposta });
+
+    const resposta = await processarIA(`Faça um resumo clínico:\n${texto}`);
+
+    res.json({ resposta: formatarResposta(resposta) });
 }
 
 export async function relatorio(req: Request, res: Response) {
     const { texto } = req.body;
-    const resposta = await gerarRelatorio(texto);
-    res.status(201).json({ resposta });
+
+    const resposta = await processarIA(`Gere um relatório psicológico:\n${texto}`);
+
+    res.json({ resposta: formatarResposta(resposta) });
 }
 
 export async function sentimento(req: Request, res: Response) {
     const { texto } = req.body;
-    const resposta = await analisarSentimento(texto);
-    res.status(201).json({ resposta });
+
+    const resposta = await processarIA(`Analise o sentimento:\n${texto}`);
+
+    res.json({ resposta: formatarResposta(resposta) });
 }
 
 export async function perguntas(req: Request, res: Response) {
     const { texto } = req.body;
-    const resposta = await sugerirPerguntas(texto);
-    res.status(201).json({ resposta });
+
+    const resposta = await processarIA(`Sugira perguntas terapêuticas:\n${texto}`);
+
+    res.json({ resposta: formatarResposta(resposta) });
 }
 
 export async function plano(req: Request, res: Response) {
     const { texto } = req.body;
-    const resposta = await gerarPlanoTerapeutico(texto);
-    res.status(201).json({ resposta });
+
+    const resposta = await processarIA(`Crie um plano terapêutico:\n${texto}`);
+
+    res.json({ resposta: formatarResposta(resposta) });
 }
 
 export async function chat(req: Request, res: Response) {
     const { mensagem } = req.body;
-    const resposta = await chatAssistente(mensagem);
-    res.status(201).json({ resposta });
+
+    const resposta = await processarIA(mensagem);
+
+    res.json({ resposta: formatarResposta(resposta) });
 }

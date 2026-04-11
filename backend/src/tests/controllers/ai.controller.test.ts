@@ -1,19 +1,71 @@
-import request from 'supertest';
-import app from '../../app';
-import * as aiService from '../../ai/ai.service';
+import request from "supertest";
+import app from "../../app";
 
-// Mock da função chatAssistente
-jest.spyOn(aiService, 'chatAssistente').mockImplementation(async (mensagem) => {
-    return "Resposta da IA enviada com sucesso!";
-});
+// Mock do cliente Ollama
+jest.mock("../../ai/ollama.client", () => ({
+    chamarOllamaComIA: jest.fn().mockResolvedValue("Resposta mockada")
+}));
 
-describe('POST /ai/chat', () => {
-    it('Deve enviar mensagem para IA e receber resposta', async () => {
-        const response = await request(app)
-            .post('/ai/chat')
-            .send({ mensagem: 'Olá, IA! Como você está?' });
+import * as ollamaClient from "../../ai/ollama.client";
 
-        expect(response.status).toBe(201);
-        expect(response.body.resposta).toBe('Resposta da IA enviada com sucesso!');
+describe("Testando endpoints IA", () => {
+
+    afterEach(() => {
+        jest.clearAllMocks();
     });
+
+    it("Resumo deve chamar a IA", async () => {
+        const response = await request(app)
+        .post("/ai/resumo")
+        .send({ texto: "Teste de sessão" });
+
+        expect(response.status).toBe(200);
+        expect(ollamaClient.chamarOllamaComIA).toHaveBeenCalled();
+    });
+
+    it("Relatório deve chamar a IA", async () => {
+        const response = await request(app)
+        .post("/ai/relatorio")
+        .send({ texto: "Texto da sessão" });
+
+        expect(response.status).toBe(200);
+        expect(ollamaClient.chamarOllamaComIA).toHaveBeenCalled();
+    });
+
+    it("Sentimento deve chamar a IA", async () => {
+        const response = await request(app)
+        .post("/ai/sentimento")
+        .send({ texto: "Paciente ansioso" });
+
+        expect(response.status).toBe(200);
+        expect(ollamaClient.chamarOllamaComIA).toHaveBeenCalled();
+    });
+
+    it("Plano terapêutico deve chamar a IA", async () => {
+        const response = await request(app)
+        .post("/ai/plano")
+        .send({ texto: "Contexto do paciente" });
+
+        expect(response.status).toBe(200);
+        expect(ollamaClient.chamarOllamaComIA).toHaveBeenCalled();
+    });
+
+    it("Perguntas deve chamar a IA", async () => {
+        const response = await request(app)
+        .post("/ai/perguntas")
+        .send({ texto: "Contexto da sessão" });
+
+        expect(response.status).toBe(200);
+        expect(ollamaClient.chamarOllamaComIA).toHaveBeenCalled();
+    });
+
+    it("Chat deve chamar a IA", async () => {
+        const response = await request(app)
+            .post("/ai/chat")
+            .send({ mensagem: "Olá IA!" });
+
+        expect(response.status).toBe(200);
+        expect(ollamaClient.chamarOllamaComIA).toHaveBeenCalled();
+    });
+
 });
