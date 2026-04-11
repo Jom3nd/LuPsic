@@ -23,24 +23,11 @@ export async function login(req: Request, res: Response) {
     try {
         const { email, senha } = req.body;
 
-        const data = await authService.login(email, senha);
+        const token = await authService.login(email, senha);
 
-        // salva o token no cookie (mais seguro)
-        res.cookie("token", data.token, {
-            httpOnly: true,
-            secure: false, // true em produção (HTTPS)
-            sameSite: "strict",
-            maxAge: 24 * 60 * 60 * 1000
-        });
-
-        return res.json({
-            message: "Login realizado com sucesso",
-            data: data.user
-        });
+        return res.json({ token });
 
     } catch (error: any) {
-        return res.status(400).json({
-            error: error.message || "Usuário ou senha inválidos"
-        });
+    return res.status(400).json({ error: "Usuário ou senha inválidos" });
     }
 }
