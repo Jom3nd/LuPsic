@@ -27,13 +27,11 @@ Usuário: ${mensagem}
 `;
 }
 
-// interpretação com Phi-3
 async function interpretarComPhi(mensagem: string) {
     const prompt = gerarPromptInterpretacao(mensagem);
     return await chamarOllamaComIA("phi3", prompt);
 }
 
-// resposta com LLaMA 3
 async function responderComLlama(mensagem: string) {
     const prompt = `
 Você é um assistente clínico para psicólogos.
@@ -47,63 +45,85 @@ ${mensagem}
     return await chamarOllamaComIA("llama3", prompt);
 }
 
-// executar ação com segurança
-async function executarAcao(parsed: any) {
+async function executarAcao(parsed: any, userId: number) {
     if (!validarTool(parsed)) {
-    return {
-        tipo: "erro",
-        message: "Parâmetros inválidos",
-    };
-}
+        return {
+            tipo: "erro",
+            message: "Parâmetros inválidos",
+        };
+    }
+
+    if (!userId) {
+        return {
+            tipo: "erro",
+            message: "Usuário não autenticado",
+        };
+    }
 
     const action = toolMap[parsed.action];
 
     if (!action) {
         return {
-        tipo: "erro",
-        message: "Ação não reconhecida",
-    };
-}
+            tipo: "erro",
+            message: "Ação não reconhecida",
+        };
+    }
+
+    if (parsed.action === "criar_sessao") {
+        if (typeof parsed.data.pacienteId !== "number") { //validação de dados por tipo de dado de entrada
+            return { tipo: "erro", message: "pacienteId inválido" };
+        }
+
+        if (isNaN(new Date(parsed.data.data).getTime())) { //validação de dados por tipo de dado de entrada
+            return { tipo: "erro", message: "Data inválida" };
+        }
+    }
 
     try {
-        return await action(parsed.data);
+        return await action(parsed.data, userId);
     } catch (error: any) {
-    return {
-        tipo: "erro",
-        message: error.message || "Erro ao executar ação",
+        return {
+            tipo: "erro",
+            message: error.message || "Erro ao executar ação",
         };
     }
 }
-export async function processarIA(mensagem: string) {
-    // interpretar comando
+
+export async function processarIA(mensagem: string, userId: number) {
     const interpretacao = await interpretarComPhi(mensagem);
 
     let parsed;
 
     try {
-        parsed = JSON.parse(interpretacao);
-    } catch {
-    // fallback → resposta direta
-    const resposta = await responderComLlama(mensagem);
+        const clean = interpretacao // remove as marcações de código na resposta do Phi-3
+            .replace(/```json/g, "")
+            .replace(/```/g, "")
+            .trim();
 
-    return {
-        tipo: "resposta",
-        conteudo: resposta,
+        parsed = JSON.parse(clean);
+    } catch {
+        const resposta = await responderComLlama(mensagem);
+
+        return {
+            tipo: "resposta",
+            conteudo: resposta,
         };
     }
 
-  // executar ação (se houver)
-    if (parsed.action && parsed.action !== "responder") {
-    const resultado = await executarAcao(parsed);
+    if (typeof parsed.action === "string" && parsed.action !== "responder") {
+        const resultado = await executarAcao(parsed, userId);
 
-    return {
-        tipo: "acao",
-        conteudo: resultado.message,
-        data: resultado.data || null
-    };
-}
+        if (resultado.tipo === "erro") {
+            return resultado;
+        }
 
-  // resposta normal
+        return {
+            tipo: "acao",
+            conteudo: resultado.message,
+            data: resultado.data || null,
+        };
+    }
+
     const resposta = await responderComLlama(mensagem);
 
     return {

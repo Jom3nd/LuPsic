@@ -9,8 +9,11 @@ export async function criarRespostaIA(
     pacienteId?: number,
     usuarioId?: number
 ) {
+    if (!usuarioId) {
+    throw new Error("Usuário não informado"); //Validação do usuárioId para garantir que a resposta seja associada a um usuário específico
+}
     
-    const respostaIA = await processarIA(texto);
+    const respostaIA = await processarIA(texto, usuarioId!);
 
     // evita erro com objeto
     const respostaFormatada =

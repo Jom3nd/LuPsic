@@ -7,54 +7,56 @@ datasource db {
 }
 
 model Usuario {
-  id       Int      @id @default(autoincrement())
-  nome     String
-  email    String   @unique
-  senha    String
-  criadoEm DateTime @default(now())
+  id         Int          @id @default(autoincrement())
+  nome       String
+  email      String       @unique
+  senha      String
+  criadoEm   DateTime     @default(now())
 
-  sessoes     Sessao[]
-  iaResponses IAResponse[]
+  pacientes  Paciente[]
+  sessoes    Sessao[]
+  respostas  IAResponse[]
 }
 
 model Paciente {
-  id    Int    @id @default(autoincrement())
-  name  String
-  idade Int
+  id         Int      @id @default(autoincrement())
+  name       String
+  idade      Int
 
-  sessoes     Sessao[]
-  iaResponses IAResponse[]
+  usuarioId  Int?
+  usuario    Usuario?  @relation(fields: [usuarioId], references: [id])
+
+  sessoes    Sessao[]
+  respostas  IAResponse[]
 }
 
 model Sessao {
-  id             Int      @id @default(autoincrement())
-  data           DateTime
-  observacao     String?
-  pacienteId     Int
-  usuarioId      Int
-  dataHoraInicio DateTime @default(now())
+  id              Int      @id @default(autoincrement())
+  dataHoraInicio  DateTime
+  observacao      String?
 
-  paciente Paciente @relation(fields: [pacienteId], references: [id])
-  usuario  Usuario  @relation(fields: [usuarioId], references: [id])
+  usuarioId       Int
+  pacienteId      Int
 
-  iaResponses IAResponse[]
+  usuario         Usuario  @relation(fields: [usuarioId], references: [id])
+  paciente        Paciente @relation(fields: [pacienteId], references: [id])
+
+  respostas       IAResponse[]
 }
 
 model IAResponse {
-  id Int @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
+  tipo        String
+  modelo      String
+  prompt      String
+  resposta    String
+  criadoEm    DateTime @default(now())
 
-  tipo     String
-  modelo   String
-  prompt   String
-  resposta String
+  usuarioId   Int
+  pacienteId  Int?
+  sessaoId    Int?
 
-  sessaoId   Int?
-  pacienteId Int?
-  usuarioId  Int?
-
-  criadoEm DateTime @default(now())
-
-  sessao   Sessao?   @relation(fields: [sessaoId], references: [id])
-  paciente Paciente? @relation(fields: [pacienteId], references: [id])
-  usuario  Usuario?  @relation(fields: [usuarioId], references: [id])
+  usuario     Usuario  @relation(fields: [usuarioId], references: [id])
+  paciente    Paciente? @relation(fields: [pacienteId], references: [id])
+  sessao      Sessao?   @relation(fields: [sessaoId], references: [id])
 }
