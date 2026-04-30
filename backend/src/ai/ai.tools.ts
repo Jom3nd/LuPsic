@@ -59,7 +59,7 @@ export async function criarSessao(data: any, userId: number) {
 
     const sessao = await prisma.sessao.create({
         data: {
-            data: new Date(data.data),
+            dataHoraInicio: new Date(data.data),
 
             paciente: {
                 connect: { id: data.pacienteId }
