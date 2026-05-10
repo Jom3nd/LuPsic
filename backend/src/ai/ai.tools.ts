@@ -14,14 +14,14 @@ export const tools = [
     description: "Agenda uma sessão",
     parameters: {
         pacienteId: "number",
-        data: "string",
-    },
-},
+        dataTexto: "string"
+    }
+}
 ];
 
 // Funções reais (execução)
 export async function criarPaciente(data: any, userId: number) {
-    if (!data.nome || !data.idade) {
+    if (!data.nome || data.idade == null) { // idade pode ser 0, então verificamos null ou undefined
         throw new Error("Dados inválidos para paciente");
     }
 
@@ -41,28 +41,30 @@ export async function criarPaciente(data: any, userId: number) {
 }
 
 export async function criarSessao(data: any, userId: number) {
-    if (!data.pacienteId || !data.data) {
+
+    if (data.pacienteId == null || !data.dataTexto) {
         throw new Error("Dados inválidos para sessão");
     }
 
-    //valida se o paciente pertence ao usuário
     const paciente = await prisma.paciente.findFirst({
         where: {
-            id: data.pacienteId,
+            id: Number(data.pacienteId),
             usuarioId: userId
         }
     });
 
     if (!paciente) {
-        throw new Error("Paciente não encontrado ou não pertence ao usuário");
+        throw new Error("Paciente não encontrado");
     }
+
+    const dataConvertida = converterDataNatural(data.dataTexto);
 
     const sessao = await prisma.sessao.create({
         data: {
-            dataHoraInicio: new Date(data.data),
+            dataHoraInicio: dataConvertida,
 
             paciente: {
-                connect: { id: data.pacienteId }
+                connect: { id: Number(data.pacienteId) }
             },
 
             usuario: {
@@ -73,10 +75,41 @@ export async function criarSessao(data: any, userId: number) {
 
     return {
         tipo: "acao",
-        message: "Sessão criada com sucesso",
+        message: `Sessão agendada para ${paciente.name} em ${dataConvertida.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}`,
         data: sessao
     };
 }
+
+function converterDataNatural(texto: string): Date {
+    const data = new Date();
+    const textoLower = texto.toLowerCase();
+
+    // Lógica para dias
+    if (textoLower.includes("amanhã")) {
+        data.setDate(data.getDate() + 1);
+    } else if (textoLower.includes("depois de amanhã")) {
+        data.setDate(data.getDate() + 2);
+    } else if (textoLower.includes("hoje")) {
+        // mantém hoje
+    }
+
+    // Lógica para horas (ex: 12:00, 12h, as 12, 12:30)
+    const horaMatch = textoLower.match(/(\d{1,2})(?:[:h](\d{2}))?/);
+
+    if (horaMatch) {
+        let hora = Number(horaMatch[1]);
+        const minuto = Number(horaMatch[2] || 0);
+
+        // Se o usuário disser "as 2" e for tarde, podemos assumir 14h? 
+        // Por enquanto, vamos manter o que for dito.
+        data.setHours(hora, minuto, 0, 0);
+    } else {
+        data.setHours(9, 0, 0, 0); // Default 9h
+    }
+
+    return data;
+}
+
 
 // Mapeamento das tools
 export const toolMap: Record<string, Function> = {
@@ -86,12 +119,19 @@ export const toolMap: Record<string, Function> = {
 
 // Validação
 export function validarTool(parsed: any) {
-    const tool = tools.find((t) => t.name === parsed.action);
-    if (!tool) return false;
+    const tool = tools.find(t => t.name === parsed.action);
+
+    if (!tool) {
+        console.log("Tool inexistente");
+        return false;
+    }
 
     for (const key of Object.keys(tool.parameters)) {
-    if (!(key in parsed.data)) return false;
-}
+        if (!parsed.data || !(key in parsed.data)) {
+            console.log("Campo faltando:", key);
+            return false;
+        }
+    }
 
     return true;
 }
