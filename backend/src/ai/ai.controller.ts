@@ -73,52 +73,16 @@ export async function chat(req: Request, res: Response) {
             });
         }
 
-        // IA interpreta comando
-        const aiResult = await chamarOllamaComIA("phi3", message);
-        console.log("Resultado da interpretação da IA:", aiResult);
-
-        // erro de interpretação
-        if (!aiResult || aiResult.action === "erro") {
-            return res.status(400).json({
-                message: "Não consegui interpretar o comando."
-            });
-        }
-
-        // conversa natural
-        if (aiResult.action === "responder") {
-            const respostaNatural = await chamarOllamaComIA("llama3", message);
-
-            return res.json({
-                message: respostaNatural
-            });
-        }
-
-        // valida se action existe e parâmetros corretos
-        if (!validarTool(aiResult)) {
-            return res.status(400).json({
-                message: "Comando inválido."
-            });
-        }
-
-        // pega função correspondente
-        const executar = toolMap[aiResult.action];
-
-        if (!executar) {
-            return res.status(400).json({
-                message: "Ação não encontrada."
-            });
-        }
-
-        // executa com segurança
-        const resultado = await executar(aiResult.data, userId);
+        // Chama o serviço unificado que já lida com o modelo Qwen e contexto
+        const resultado = await processarIA(message, userId);
 
         return res.json(resultado);
 
     } catch (error: any) {
-        console.error(error);
+        console.error("Erro no Chat IA:", error);
 
         return res.status(500).json({
             message: error.message || "Erro interno do servidor"
         });
     }
-}
+}
