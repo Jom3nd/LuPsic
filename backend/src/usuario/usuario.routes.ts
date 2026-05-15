@@ -1,11 +1,12 @@
 import {Router} from 'express';
 import * as usuarioController from './usuario.controller';
+import { autenticarToken } from '../auth/auth.middleware';
 
 const router = Router();
 
-router.post('/', usuarioController.criarUsuario);
-router.get('/', usuarioController.listarUsuarios);
-router.delete('/:id', usuarioController.deletarUsuario);
-router.put('/:id', usuarioController.atualizarUsuario);
+router.post('/',autenticarToken, usuarioController.criarUsuario);
+router.get('/',autenticarToken, usuarioController.listarUsuarios);
+router.delete('/:id',autenticarToken, usuarioController.deletarUsuario);
+router.put('/:id',autenticarToken, usuarioController.atualizarUsuario);
 
 export default router;
