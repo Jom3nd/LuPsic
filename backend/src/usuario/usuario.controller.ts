@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
-import prisma from '../lib/prisma';
+import * as usuarioService from './usuario.service';
+import { AuthRequest } from '../types';
 
 export async function criarUsuario(req: Request, res: Response) {
     const { nome, email, senha } = req.body;
@@ -9,67 +10,82 @@ export async function criarUsuario(req: Request, res: Response) {
     }
 
     try {
-        const usuario = await prisma.usuario.create({
-        data: { nome, email, senha },
-    });
-
-    return res.status(201).json(usuario);
+        const usuario = await usuarioService.criarUsuario({ nome, email, senha });
+        return res.status(201).json(usuario);
     } catch (error: any) {
-    if (error.code === 'P2002') {
-        return res.status(400).json({ error: 'Email já cadastrado' });
-    }
-
-    return res.status(500).json({ error: 'Erro ao criar usuário' });
+        if (error.code === 'P2002') {
+            return res.status(400).json({ error: 'Email já cadastrado' });
+        }
+        return res.status(500).json({ error: 'Erro ao criar usuário' });
     }
 }
 
-export async function listarUsuarios(req: Request, res: Response) {
+export async function listarUsuarios(req: AuthRequest, res: Response) {
     try {
-        const usuarios = await prisma.usuario.findMany();
-        return res.status(200).json(usuarios);
+        const userId = req.user?.id;
+        
+        if (!userId) {
+            return res.status(401).json({ error: 'Usuário não autenticado' });
+        }
+
+        const usuario = await usuarioService.buscarUsuarioPorId(userId);
+        
+        if (!usuario) {
+            return res.status(404).json({ error: 'Usuário não encontrado' });
+        }
+
+        return res.status(200).json(usuario);
     } catch (error) {
-    return res.status(500).json({ error: 'Erro ao listar usuários' });
+        return res.status(500).json({ error: 'Erro ao buscar perfil do usuário' });
     }
 }
 
-export async function deletarUsuario(req: Request, res: Response) {
+export async function deletarUsuario(req: AuthRequest, res: Response) {
     const id = Number(req.params.id);
+    const userId = req.user?.id;
+
+    if (!userId) {
+        return res.status(401).json({ error: 'Usuário não autenticado' });
+    }
+
+    if (id !== userId) {
+        return res.status(403).json({ error: 'Acesso negado: você só pode deletar sua própria conta' });
+    }
 
     try {
-        await prisma.usuario.delete({
-        where: { id },
-    });
-
-    return res.status(204).send();
+        await usuarioService.deletarUsuario(id);
+        return res.status(204).send();
     } catch (error: any) {
-    if (error.code === 'P2025') {
-        return res.status(404).json({ error: 'Usuário não encontrado' });
-    }
-
-    return res.status(500).json({ error: 'Erro ao deletar usuário' });
+        if (error.code === 'P2025') {
+            return res.status(404).json({ error: 'Usuário não encontrado' });
+        }
+        return res.status(500).json({ error: 'Erro ao deletar usuário' });
     }
 }
 
-export async function atualizarUsuario(req: Request, res: Response) {
+export async function atualizarUsuario(req: AuthRequest, res: Response) {
     const id = Number(req.params.id);
+    const userId = req.user?.id;
     const { nome, email, senha } = req.body;
 
+    if (!userId) {
+        return res.status(401).json({ error: 'Usuário não autenticado' });
+    }
+
+    if (id !== userId) {
+        return res.status(403).json({ error: 'Acesso negado: você só pode atualizar sua própria conta' });
+    }
+
     try {
-        const usuario = await prisma.usuario.update({
-        where: { id },
-        data: { nome, email, senha },
-    });
-
-    return res.status(200).json(usuario);
+        const usuario = await usuarioService.atualizarUsuario(id, { nome, email, senha });
+        return res.status(200).json(usuario);
     } catch (error: any) {
-    if (error.code === 'P2025') {
-        return res.status(404).json({ error: 'Usuário não encontrado' });
-    }
-
-    if (error.code === 'P2002') {
-        return res.status(400).json({ error: 'Email já cadastrado' });
-    }
-
-    return res.status(500).json({ error: 'Erro ao atualizar usuário' });
+        if (error.code === 'P2025') {
+            return res.status(404).json({ error: 'Usuário não encontrado' });
+        }
+        if (error.code === 'P2002') {
+            return res.status(400).json({ error: 'Email já cadastrado' });
+        }
+        return res.status(500).json({ error: 'Erro ao atualizar usuário' });
     }
 }
