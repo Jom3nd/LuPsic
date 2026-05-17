@@ -82,15 +82,49 @@ export async function criarSessao(data: any, userId: number) {
 
 function converterDataNatural(texto: string): Date {
     const data = new Date();
-    const textoLower = texto.toLowerCase();
+    let textoLower = texto.toLowerCase();
 
-    // Lógica para dias
-    if (textoLower.includes("amanhã")) {
-        data.setDate(data.getDate() + 1);
-    } else if (textoLower.includes("depois de amanhã")) {
-        data.setDate(data.getDate() + 2);
-    } else if (textoLower.includes("hoje")) {
-        // mantém hoje
+    // 1. Tenta encontrar datas no formato YYYY-MM-DD
+    const yyyymmddMatch = textoLower.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
+    if (yyyymmddMatch) {
+        const ano = Number(yyyymmddMatch[1]);
+        const mes = Number(yyyymmddMatch[2]) - 1; // 0-indexed no JS
+        const dia = Number(yyyymmddMatch[3]);
+        data.setFullYear(ano, mes, dia);
+        // Remove a data encontrada do texto para não interferir no parsing da hora
+        textoLower = textoLower.replace(yyyymmddMatch[0], "");
+    } else {
+        // 2. Tenta encontrar datas no formato DD/MM/YYYY ou DD/MM/YY
+        const ddmmyyyyMatch = textoLower.match(/(\d{1,2})[/-](\d{1,2})[/-](\d{4}|\d{2})/);
+        if (ddmmyyyyMatch) {
+            const dia = Number(ddmmyyyyMatch[1]);
+            const mes = Number(ddmmyyyyMatch[2]) - 1; // 0-indexed no JS
+            let ano = Number(ddmmyyyyMatch[3]);
+            if (ano < 100) {
+                // assume século 21 para anos de 2 dígitos
+                ano += 2000;
+            }
+            data.setFullYear(ano, mes, dia);
+            textoLower = textoLower.replace(ddmmyyyyMatch[0], "");
+        } else {
+            // 3. Tenta encontrar datas no formato DD/MM (sem o ano, assume ano atual)
+            const ddmmMatch = textoLower.match(/(\d{1,2})[/-](\d{1,2})/);
+            if (ddmmMatch) {
+                const dia = Number(ddmmMatch[1]);
+                const mes = Number(ddmmMatch[2]) - 1; // 0-indexed no JS
+                data.setMonth(mes, dia);
+                textoLower = textoLower.replace(ddmmMatch[0], "");
+            } else {
+                // 4. Lógica para dias relativos
+                if (textoLower.includes("amanhã") || textoLower.includes("amanha")) {
+                    data.setDate(data.getDate() + 1);
+                } else if (textoLower.includes("depois de amanhã") || textoLower.includes("depois de amanha")) {
+                    data.setDate(data.getDate() + 2);
+                } else if (textoLower.includes("hoje")) {
+                    // mantém hoje
+                }
+            }
+        }
     }
 
     // Lógica para horas (ex: 12:00, 12h, as 12, 12:30)
@@ -100,8 +134,6 @@ function converterDataNatural(texto: string): Date {
         let hora = Number(horaMatch[1]);
         const minuto = Number(horaMatch[2] || 0);
 
-        // Se o usuário disser "as 2" e for tarde, podemos assumir 14h? 
-        // Por enquanto, vamos manter o que for dito.
         data.setHours(hora, minuto, 0, 0);
     } else {
         data.setHours(9, 0, 0, 0); // Default 9h
