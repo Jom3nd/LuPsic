@@ -1,0 +1,44 @@
+services:
+  # Banco de Dados
+  db:
+    image: postgres:15-alpine
+    container_name: psicologo-db
+    restart: always
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: psicologo_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # Backend API
+  backend:
+    build: ./backend
+    container_name: psicologo-backend
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: "postgresql://user:password@db:5432/psicologo_db?schema=public"
+      JWT_SECRET: "JWT_SECRET"
+      OLLAMA_URL: "http://host.docker.internal:11434"
+      PORT: 3000
+    depends_on:
+      - db
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # Frontend Web
+  frontend:
+    build: ./frontend/mindful-assistant
+    container_name: psicologo-frontend
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

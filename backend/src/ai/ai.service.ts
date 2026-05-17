@@ -1,35 +1,46 @@
 import { chamarOllamaComIA } from "./ollama.client";
 import { tools, toolMap, validarTool } from "./ai.tools";
+import prisma from "../lib/prisma";
 
-function gerarPromptInterpretacao(mensagem: string) {
+function gerarPromptInterpretacao(mensagem: string, pacientes: any[], dataAtual: string) {
+    const listaPacientes = pacientes.map(p => `- ID: ${p.id}, Nome: ${p.name}`).join("\n");
+
     return `
-Você é um interpretador de comandos.
+Data e hora atual: ${dataAtual}
 
-Você pode executar as seguintes ações:
+Lista de pacientes cadastrados:
+${listaPacientes || "Nenhum paciente cadastrado."}
 
+Você é um interpretador de comandos clínicos. Analise a mensagem do usuário e identifique TODAS as ações desejadas.
+
+Ações possíveis:
 ${JSON.stringify(tools, null, 2)}
 
-Responda SOMENTE em JSON:
-
+REGRAS:
+1. Se o usuário pedir mais de uma coisa (ex: criar paciente E agendar sessão), retorne todas as ações na lista "actions".
+2. Para "criar_sessao", se o paciente acabou de ser mencionado para criação na mesma mensagem mas ainda não tem ID real, use "pacienteId": 0.
+3. Retorne SEMPRE um JSON no formato:
 {
-    "action": "nome_da_acao",
-    "data": {}
+    "actions": [
+        { "action": "nome_da_acao", "data": {} }
+    ]
 }
 
-Se não for uma ação, responda:
-
+Se não houver ação clara, use:
 {
-    "action": "responder",
-    "data": {}
+    "actions": [
+        { "action": "responder", "data": {} }
+    ]
 }
 
-Usuário: ${mensagem}
+Mensagem do Usuário: ${mensagem}
 `;
 }
 
-async function interpretarComPhi(mensagem: string) {
-    const prompt = gerarPromptInterpretacao(mensagem);
-    return await chamarOllamaComIA("phi3", prompt);
+
+async function interpretarComQwen(mensagem: string, pacientes: any[], dataAtual: string) {
+    const prompt = gerarPromptInterpretacao(mensagem, pacientes, dataAtual);
+    return await chamarOllamaComIA("qwen2.5-coder:7b", prompt);
 }
 
 async function responderComLlama(mensagem: string) {
@@ -70,12 +81,12 @@ async function executarAcao(parsed: any, userId: number) {
     }
 
     if (parsed.action === "criar_sessao") {
-        if (typeof parsed.data.pacienteId !== "number") { //validação de dados por tipo de dado de entrada
-            return { tipo: "erro", message: "pacienteId inválido" };
+        if (parsed.data.pacienteId === 0) {
+            return { tipo: "erro", message: "Paciente não encontrado. Por favor, cadastre o paciente primeiro ou verifique o nome." };
         }
-
-        if (isNaN(new Date(parsed.data.data).getTime())) { //validação de dados por tipo de dado de entrada
-            return { tipo: "erro", message: "Data inválida" };
+        
+        if (!parsed.data.pacienteId) {
+            return { tipo: "erro", message: "ID do paciente não informado" };
         }
     }
 
@@ -90,18 +101,30 @@ async function executarAcao(parsed: any, userId: number) {
 }
 
 export async function processarIA(mensagem: string, userId: number) {
-    const interpretacao = await interpretarComPhi(mensagem);
+    // Buscar pacientes do usuário para dar contexto à IA
+    const pacientes = await prisma.paciente.findMany({
+        where: { usuarioId: userId },
+        select: { id: true, name: true }
+    });
+
+    const dataAtual = new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
+
+    const interpretacao = await interpretarComQwen(mensagem, pacientes, dataAtual);
 
     let parsed;
 
     try {
-        const clean = interpretacao // remove as marcações de código na resposta do Phi-3
+        // Garantir que é string antes de limpar
+        const rawString = typeof interpretacao === "string" ? interpretacao : JSON.stringify(interpretacao);
+
+        const clean = rawString // remove as marcações de código na resposta da IA
             .replace(/```json/g, "")
             .replace(/```/g, "")
             .trim();
 
         parsed = JSON.parse(clean);
-    } catch {
+    } catch (error) {
+        console.error("Erro ao processar JSON da IA:", error);
         const resposta = await responderComLlama(mensagem);
 
         return {
@@ -110,24 +133,39 @@ export async function processarIA(mensagem: string, userId: number) {
         };
     }
 
-    if (typeof parsed.action === "string" && parsed.action !== "responder") {
-        const resultado = await executarAcao(parsed, userId);
+    // Se não houver array de ações, tenta converter formato antigo para o novo
+    const actions = parsed.actions || (parsed.action ? [parsed] : []);
 
-        if (resultado.tipo === "erro") {
-            return resultado;
-        }
-
-        return {
-            tipo: "acao",
-            conteudo: resultado.message,
-            data: resultado.data || null,
-        };
+    if (actions.length === 0 || (actions.length === 1 && actions[0].action === "responder")) {
+        const resposta = await responderComLlama(mensagem);
+        return { tipo: "resposta", conteudo: resposta };
     }
 
-    const resposta = await responderComLlama(mensagem);
+    const resultados = [];
+    let ultimoPacienteCriadoId = null;
+
+    for (const item of actions) {
+        // Se for criar sessão e o pacienteId for 0 (indicando que acabou de ser criado no mesmo comando)
+        if (item.action === "criar_sessao" && item.data.pacienteId === 0 && ultimoPacienteCriadoId) {
+            item.data.pacienteId = ultimoPacienteCriadoId;
+        }
+
+        const resultado = await executarAcao(item, userId);
+        
+        if (resultado.tipo !== "erro") {
+            resultados.push(resultado.message);
+            // Salva o ID se um paciente foi criado para usar na próxima ação do loop
+            if (item.action === "criar_paciente" && resultado.data?.id) {
+                ultimoPacienteCriadoId = resultado.data.id;
+            }
+        } else {
+            resultados.push(`Erro em ${item.action}: ${resultado.message}`);
+        }
+    }
 
     return {
-        tipo: "resposta",
-        conteudo: resposta,
+        tipo: "acao",
+        conteudo: resultados.join(" | "),
+        data: actions
     };
-}
+}

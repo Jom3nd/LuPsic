@@ -1,55 +1,68 @@
-import {Request , Response} from 'express';
+import { Response } from 'express';
 import * as pacienteService from './paciente.service';
+import { AuthRequest } from '../types';
 
-export async function criarPaciente(req: Request, res: Response){
-
+export async function criarPaciente(req: AuthRequest, res: Response) {
     try {
-        const paciente = await pacienteService.criarPaciente(req.body);
+        const userId = req.user?.id;
+        if (!userId) return res.status(401).json({ error: 'Não autorizado' });
+
+        const paciente = await pacienteService.criarPaciente(req.body, userId);
         return res.status(201).json(paciente);
-    }catch(erro){
-        return res.status(500).json({error: 'Erro ao criar paciente'});
+    } catch (error: any) {
+        return res.status(400).json({ error: error.message || 'Erro ao criar paciente' });
     }
 }
 
-export async function listarPacientes(req:Request, res:Response){
+export async function listarPacientes(req: AuthRequest, res: Response) {
     try {
-        const pacientes = await pacienteService.listarPacientes();
+        const userId = req.user?.id;
+        if (!userId) return res.status(401).json({ error: 'Não autorizado' });
+
+        const pacientes = await pacienteService.listarPacientes(userId);
         return res.status(200).json(pacientes);
-    }catch(erro){
-        return res.status(500).json({error: 'Erro ao listar pacientes'});
+    } catch (error) {
+        return res.status(500).json({ error: 'Erro ao listar pacientes' });
     }
 }
 
-export async function getPacienteById(req:Request, res:Response){
-
-    const id = Number(req.params.id);
-    const paciente = await pacienteService.getPacienteById(id);
-
-    if(paciente){
-        return res.status(200).json(paciente);
-    }else{
-        return res.status(404).json({error: 'Paciente não encontrado'});
-    }
-}
-
-export async function atualizarPaciente(req:Request, res:Response){
-
-    const id = Number(req.params.id);
-    try {
-        const paciente = await pacienteService.atualizarPaciente(id, req.body);
-        return res.status(200).json(paciente);
-    }catch(erro){
-        return res.status(500).json({error: 'Erro ao atualizar paciente'});
-    }
-}
-
-export async function deletarPaciente(req:Request, res:Response){
-    
+export async function getPacienteById(req: AuthRequest, res: Response) {
     try {
         const id = Number(req.params.id);
-        await pacienteService.deletarPaciente(id);
+        const userId = req.user?.id;
+        if (!userId) return res.status(401).json({ error: 'Não autorizado' });
+
+        const paciente = await pacienteService.getPacienteById(id, userId);
+        if (!paciente) return res.status(404).json({ error: 'Paciente não encontrado' });
+
+        return res.status(200).json(paciente);
+    } catch (error) {
+        return res.status(500).json({ error: 'Erro ao buscar paciente' });
+    }
+}
+
+export async function atualizarPaciente(req: AuthRequest, res: Response) {
+    try {
+        const id = Number(req.params.id);
+        const userId = req.user?.id;
+        if (!userId) return res.status(401).json({ error: 'Não autorizado' });
+
+        const paciente = await pacienteService.atualizarPaciente(id, req.body, userId);
+        return res.status(200).json(paciente);
+    } catch (error: any) {
+        return res.status(400).json({ error: error.message || 'Erro ao atualizar paciente' });
+    }
+}
+
+export async function deletarPaciente(req: AuthRequest, res: Response) {
+    try {
+        const id = Number(req.params.id);
+        const userId = req.user?.id;
+        if (!userId) return res.status(401).json({ error: 'Não autorizado' });
+
+        await pacienteService.deletarPaciente(id, userId);
         return res.status(204).send();
-    }catch(erro){
-        return res.status(500).json({error: 'Erro ao deletar paciente'});
+    } catch (error: any) {
+        return res.status(400).json({ error: error.message || 'Erro ao deletar paciente' });
     }
 }
