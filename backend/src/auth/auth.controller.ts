@@ -75,8 +75,9 @@ export async function login(req: Request, res: Response) {
         });
 
     } catch (error: any) {
+        console.error("Erro no login:", error);
         return res.status(400).json({
-            error: "Email ou senha incorretos"
+            error: error.message || "Email ou senha incorretos"
         });
     }
 }

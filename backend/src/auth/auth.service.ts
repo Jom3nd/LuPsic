@@ -43,7 +43,7 @@ export async function registrarUsuario(nome : string, email: string, senha: stri
     const usuario = await prisma.usuario.create({
         data:{
             nome,
-            email,
+            email: email.toLowerCase().trim(),
             senha: senhaHash
         }
     });
@@ -55,8 +55,14 @@ export async function registrarUsuario(nome : string, email: string, senha: stri
 }
 
 export async function login(email: string, senha: string){
-    const usuario = await prisma.usuario.findUnique({
-        where : {email}
+    const cleanEmail = email.trim();
+    const usuario = await prisma.usuario.findFirst({
+        where : {
+            email: {
+                equals: cleanEmail,
+                mode: 'insensitive'
+            }
+        }
     })
     
     // Mensagem genérica para evitar enumeração de usuários
