@@ -1,10 +1,13 @@
 import { Router } from "express";
-import { registrarUsuario, login, refreshToken, logout } from "./auth.controller";
+import { registrarUsuario, login, loginPaciente, refreshToken, logout } from "./auth.controller";
+
+import { autenticarToken, requireMaster } from "./auth.middleware";
 
 const router = Router();
 
-router.post("/registrarUsuario", registrarUsuario);
+router.post("/registrarUsuario", autenticarToken, requireMaster, registrarUsuario);
 router.post("/login", login);
+router.post("/login/paciente", loginPaciente);
 router.post("/refresh", refreshToken);
 router.post("/logout", logout);
 

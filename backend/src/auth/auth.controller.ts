@@ -82,6 +82,46 @@ export async function login(req: Request, res: Response) {
     }
 }
 
+export async function loginPaciente(req: Request, res: Response) {
+    try {
+        const { email, senha } = req.body;
+
+        const { error, value } = loginSchema.validate({ email, senha });
+        if (error) {
+            return res.status(400).json({
+                error: error.details[0].message
+            });
+        }
+
+        const data = await authService.loginPaciente(value.email, value.senha);
+
+        res.cookie('accessToken', data.accessToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 15 * 60 * 1000 // 15 minutos
+        });
+
+        res.cookie('refreshToken', data.refreshToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 dias
+        });
+
+        return res.json({
+            message: 'Autenticado com sucesso',
+            user: data.user
+        });
+
+    } catch (error: any) {
+        console.error("Erro no login de paciente:", error);
+        return res.status(400).json({
+            error: error.message || "Email ou senha incorretos"
+        });
+    }
+}
+
 /**
  * Endpoint para renovar o access token usando o refresh token
  */

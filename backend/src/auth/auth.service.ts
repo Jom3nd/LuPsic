@@ -5,6 +5,7 @@ import jwt from "jsonwebtoken";
 interface JwtPayload {
     id: number;
     email: string;
+    role: "MASTER" | "PSICOLOGO" | "FUNCIONARIO";
 }
 
 /**
@@ -50,7 +51,8 @@ export async function registrarUsuario(nome : string, email: string, senha: stri
     return {
         id : usuario.id,
         nome : usuario.nome,
-        email : usuario.email
+        email : usuario.email,
+        role: usuario.role
     }
 }
 
@@ -84,7 +86,8 @@ export async function login(email: string, senha: string){
     const accessToken = jwt.sign(
         {
             id : usuario.id,
-            email : usuario.email
+            email : usuario.email,
+            role: usuario.role
         },
         process.env.JWT_SECRET as string,
         {
@@ -96,7 +99,8 @@ export async function login(email: string, senha: string){
     const refreshToken = jwt.sign(
         {
             id : usuario.id,
-            email : usuario.email
+            email : usuario.email,
+            role: usuario.role
         },
         process.env.JWT_SECRET as string,
         {
@@ -122,7 +126,74 @@ export async function login(email: string, senha: string){
         user: {
             id: usuario.id,
             nome: usuario.nome,
-            email: usuario.email
+            email: usuario.email,
+            role: usuario.role
+        }
+    };
+}
+
+export async function loginPaciente(email: string, senha: string){
+    const cleanEmail = email.trim();
+    const paciente = await prisma.paciente.findFirst({
+        where : {
+            email: {
+                equals: cleanEmail,
+                mode: 'insensitive'
+            }
+        }
+    })
+    
+    if (!paciente || !paciente.senha) {
+        throw new Error('Email ou senha incorretos');
+    }
+    
+    // Assumimos que a senha do paciente também seja hash do bcrypt
+    const senhaValida = await bcrypt.compare(senha, paciente.senha);
+    
+    if(!senhaValida){
+        throw new Error('Email ou senha incorretos');
+    }
+    
+    if (!process.env.JWT_SECRET) {
+        throw new Error('JWT_SECRET não definido no .env');
+    }
+
+    const accessToken = jwt.sign(
+        {
+            id : paciente.id,
+            email : paciente.email,
+            role: "PACIENTE"
+        },
+        process.env.JWT_SECRET as string,
+        {
+            expiresIn: "15m"
+        }
+    );
+    
+    const refreshToken = jwt.sign(
+        {
+            id : paciente.id,
+            email : paciente.email,
+            role: "PACIENTE"
+        },
+        process.env.JWT_SECRET as string,
+        {
+            expiresIn: "7d"
+        }
+    );
+    
+    // Nota: Atualmente não temos tabela RefreshToken ligada ao Paciente. 
+    // Para simplificar, o paciente pode não ter refresh token persistido no banco, ou precisamos adicionar isso no schema depois se necessário.
+    // Vamos apenas retornar os tokens por enquanto.
+
+    return {
+        accessToken,
+        refreshToken,
+        user: {
+            id: paciente.id,
+            nome: paciente.name,
+            email: paciente.email,
+            role: "PACIENTE"
         }
     };
 }
@@ -152,7 +223,8 @@ export async function refreshAccessToken(refreshToken: string) {
         const newAccessToken = jwt.sign(
             {
                 id: decoded.id,
-                email: decoded.email
+                email: decoded.email,
+                role: decoded.role
             },
             process.env.JWT_SECRET as string,
             {
