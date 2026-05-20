@@ -6,17 +6,44 @@ datasource db {
   provider = "postgresql"
 }
 
+enum Role {
+  MASTER
+  PSICOLOGO
+  FUNCIONARIO
+}
+
+enum StatusAgendamento {
+  PENDENTE
+  CONFIRMADO
+  CANCELADO
+}
+
 model Usuario {
   id            Int              @id @default(autoincrement())
   nome          String
   email         String           @unique
   senha         String
+  role          Role             @default(PSICOLOGO)
   criadoEm      DateTime         @default(now())
 
   pacientes     Paciente[]
   sessoes       Sessao[]
   respostas     IAResponse[]
   refreshTokens RefreshToken[]
+  agendamentos Agendamento[]
+}
+
+model Agendamento{
+  id             Int      @id @default(autoincrement())
+  dataHoraInicio DateTime
+  observacao     String?
+  status         StatusAgendamento @default(PENDENTE)
+
+  usuarioId      Int
+  pacienteId     Int
+
+  usuario        Usuario  @relation(fields: [usuarioId], references: [id])
+  paciente       Paciente @relation(fields: [pacienteId], references: [id])
 }
 
 model RefreshToken {
@@ -33,13 +60,17 @@ model RefreshToken {
 model Paciente {
   id         Int      @id @default(autoincrement())
   name       String
+  email      String?  @unique
+  senha      String?
   idade      Int
+  criadoEm   DateTime @default(now())
 
   usuarioId  Int?
   usuario    Usuario?  @relation(fields: [usuarioId], references: [id])
 
   sessoes    Sessao[]
   respostas  IAResponse[]
+  agendamentos Agendamento[]
 }
 
 model Sessao {
