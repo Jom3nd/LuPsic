@@ -11,6 +11,7 @@ import aiRoutes from './ai/ai.routes'
 import sessaoRoutes from './sessao/sessao.routes'
 import pacienteRoutes from './paciente/paciente.routes'
 import authRoutes from './auth/auth.routes';
+import agendamentoRoutes from './agendamento/agendamento.routes';
 
 const app = express()
 
@@ -72,5 +73,6 @@ app.use('/ai', aiRoutes)
 app.use('/sessao', sessaoRoutes)
 app.use('/paciente', pacienteRoutes)
 app.use('/auth', authRoutes)
+app.use('/agendamentos', agendamentoRoutes)
 
 export default app
