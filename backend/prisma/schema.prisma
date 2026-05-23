@@ -8,8 +8,9 @@ datasource db {
 
 enum Role {
   MASTER
-  PSICOLOGO
+  PROFISSIONAL
   FUNCIONARIO
+  PACIENTE
 }
 
 enum StatusAgendamento {
@@ -23,7 +24,7 @@ model Usuario {
   nome          String
   email         String           @unique
   senha         String
-  role          Role             @default(PSICOLOGO)
+  role          Role             @default(PROFISSIONAL)
   criadoEm      DateTime         @default(now())
 
   pacientes     Paciente[]
@@ -44,6 +45,11 @@ model Agendamento{
 
   usuario        Usuario  @relation(fields: [usuarioId], references: [id])
   paciente       Paciente @relation(fields: [pacienteId], references: [id])
+}
+model Sala{
+  id             Int @id
+  numeroDaSala   Int
+  situacao       Boolean @default(true)
 }
 
 model RefreshToken {
