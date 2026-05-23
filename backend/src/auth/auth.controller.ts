@@ -6,7 +6,16 @@ import Joi from "joi";
 const registerSchema = Joi.object({
     nome: Joi.string().min(2).max(100).required(),
     email: Joi.string().email().required(),
-    senha: Joi.string().min(8).required()
+    senha: Joi.string()
+        .min(8)
+        .pattern(/[A-Z]/, 'maiúscula')
+        .pattern(/[a-z]/, 'minúscula')
+        .pattern(/[0-9]/, 'número')
+        .pattern(/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/, 'especial')
+        .required()
+        .messages({
+            'string.pattern.name': 'Senha deve conter pelo menos uma letra/caractere {#name}'
+        })
 });
 
 const registerPacienteSchema = Joi.object({
@@ -34,15 +43,17 @@ export async function registrarProfissional(req: Request, res: Response) {
 
         const user = await authService.registrarProfissional(value.nome, value.email, value.senha);
 
+        const master = (req as any).user;
+        console.log(`[AUDITORIA] MASTER id=${master?.id} (${master?.email}) registrou profissional: ${value.email}`);
+
         return res.status(201).json({
             message: "Profissional registrado com sucesso",
             user
         });
 
-    } catch (error: any) {
-        return res.status(400).json({
-            error: error.message || "Erro ao registrar profissional"
-        });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : "Erro ao registrar profissional";
+        return res.status(400).json({ error: message });
     }
 }
 
@@ -58,6 +69,9 @@ export async function registrarFuncionario(req: Request, res: Response) {
         }
 
         const user = await authService.registrarFuncionario(value.nome, value.email, value.senha);
+
+        const master = (req as any).user;
+        console.log(`[AUDITORIA] MASTER id=${master?.id} (${master?.email}) registrou funcionario: ${value.email}`);
 
         return res.status(201).json({
             message: "Funcionário registrado com sucesso",

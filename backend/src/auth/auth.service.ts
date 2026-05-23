@@ -1,6 +1,7 @@
 import prisma from "../lib/prisma";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import { Role } from "@prisma/client";
 import { TokenPayload } from "../types";
 
 /**
@@ -31,15 +32,22 @@ function validatePasswordStrength(password: string): void {
 }
 
 export async function registrarProfissional(nome: string, email: string, senha: string) {
+    const cleanEmail = email.toLowerCase().trim();
+
+    const exists = await prisma.usuario.findUnique({ where: { email: cleanEmail } });
+    if (exists) {
+        throw new Error("Email ja cadastrado");
+    }
+
     validatePasswordStrength(senha);
     const senhaHash = await bcrypt.hash(senha, 10);
 
     const usuario = await prisma.usuario.create({
         data: {
             nome,
-            email: email.toLowerCase().trim(),
+            email: cleanEmail,
             senha: senhaHash,
-            role: "PROFISSIONAL"
+            role: Role.PROFISSIONAL
         },
         select: {
             id: true,
@@ -48,19 +56,28 @@ export async function registrarProfissional(nome: string, email: string, senha: 
             role: true
         }
     });
+
+    console.log(`[AUDITORIA] Profissional registrado | email: ${cleanEmail} | em: ${new Date().toISOString()}`);
     return usuario;
 }
 
 export async function registrarFuncionario(nome: string, email: string, senha: string) {
+    const cleanEmail = email.toLowerCase().trim();
+
+    const exists = await prisma.usuario.findUnique({ where: { email: cleanEmail } });
+    if (exists) {
+        throw new Error("Email ja cadastrado");
+    }
+
     validatePasswordStrength(senha);
     const senhaHash = await bcrypt.hash(senha, 10);
 
     const usuario = await prisma.usuario.create({
         data: {
             nome,
-            email: email.toLowerCase().trim(),
+            email: cleanEmail,
             senha: senhaHash,
-            role: "FUNCIONARIO"
+            role: Role.FUNCIONARIO
         },
         select: {
             id: true,
@@ -69,10 +86,19 @@ export async function registrarFuncionario(nome: string, email: string, senha: s
             role: true
         }
     });
+
+    console.log(`[AUDITORIA] Funcionario registrado | email: ${cleanEmail} | em: ${new Date().toISOString()}`);
     return usuario;
 }
 
 export async function registrarPaciente(nome: string, idade: number, email: string, senha: string) {
+    const cleanEmail = email.toLowerCase().trim();
+
+    const exists = await prisma.paciente.findUnique({ where: { email: cleanEmail } });
+    if (exists) {
+        throw new Error("Email ja cadastrado");
+    }
+
     validatePasswordStrength(senha);
     const senhaHash = await bcrypt.hash(senha, 10);
 
@@ -80,7 +106,7 @@ export async function registrarPaciente(nome: string, idade: number, email: stri
         data: {
             name: nome,
             idade: idade,
-            email: email.toLowerCase().trim(),
+            email: cleanEmail,
             senha: senhaHash
         },
         select: {
@@ -90,6 +116,8 @@ export async function registrarPaciente(nome: string, idade: number, email: stri
             idade: true
         }
     });
+
+    console.log(`[AUDITORIA] Paciente registrado | email: ${cleanEmail} | em: ${new Date().toISOString()}`);
     return paciente;
 }
 
