@@ -9,16 +9,22 @@ const registerSchema = Joi.object({
     senha: Joi.string().min(8).required()
 });
 
+const registerPacienteSchema = Joi.object({
+    nome: Joi.string().min(2).max(100).required(),
+    email: Joi.string().email().required(),
+    senha: Joi.string().min(8).required(),
+    idade: Joi.number().integer().min(1).max(150).required()
+});
+
 const loginSchema = Joi.object({
     email: Joi.string().email().required(),
     senha: Joi.string().required()
 });
 
-export async function registrarUsuario(req: Request, res: Response) {
+export async function registrarProfissional(req: Request, res: Response) {
     try {
         const { nome, email, senha } = req.body;
 
-        // Validar inputs com Joi
         const { error, value } = registerSchema.validate({ nome, email, senha });
         if (error) {
             return res.status(400).json({
@@ -26,16 +32,41 @@ export async function registrarUsuario(req: Request, res: Response) {
             });
         }
 
-        const user = await authService.registrarUsuario(value.nome, value.email, value.senha);
+        const user = await authService.registrarProfissional(value.nome, value.email, value.senha);
 
         return res.status(201).json({
-            message: "Usuário registrado com sucesso",
+            message: "Profissional registrado com sucesso",
             user
         });
 
     } catch (error: any) {
         return res.status(400).json({
-            error: error.message || "Erro ao registrar usuário"
+            error: error.message || "Erro ao registrar profissional"
+        });
+    }
+}
+
+export async function registrarFuncionario(req: Request, res: Response) {
+    try {
+        const { nome, email, senha } = req.body;
+
+        const { error, value } = registerSchema.validate({ nome, email, senha });
+        if (error) {
+            return res.status(400).json({
+                error: error.details[0].message
+            });
+        }
+
+        const user = await authService.registrarFuncionario(value.nome, value.email, value.senha);
+
+        return res.status(201).json({
+            message: "Funcionário registrado com sucesso",
+            user
+        });
+
+    } catch (error: any) {
+        return res.status(400).json({
+            error: error.message || "Erro ao registrar funcionário"
         });
     }
 }
@@ -152,6 +183,31 @@ export async function refreshToken(req: Request, res: Response) {
     } catch (error: any) {
         return res.status(401).json({
             error: "Falha ao renovar token"
+        });
+    }
+}
+
+export async function registrarPaciente(req: Request, res: Response) {
+    try {
+        const { nome, email, senha, idade } = req.body;
+
+        const { error, value } = registerPacienteSchema.validate({ nome, email, senha, idade });
+        if (error) {
+            return res.status(400).json({
+                error: error.details[0].message
+            });
+        }
+
+        const paciente = await authService.registrarPaciente(value.nome,value.idade, value.email, value.senha);
+
+        return res.status(201).json({
+            message: "Paciente registrado com sucesso",
+            paciente
+        });
+
+    } catch (error: any) {
+        return res.status(400).json({
+            error: error.message || "Erro ao registrar paciente"
         });
     }
 }

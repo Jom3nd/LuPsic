@@ -1,12 +1,7 @@
 import prisma from "../lib/prisma";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-
-interface JwtPayload {
-    id: number;
-    email: string;
-    role: "MASTER" | "PSICOLOGO" | "FUNCIONARIO";
-}
+import { TokenPayload } from "../types";
 
 /**
  * Valida a força da senha
@@ -35,25 +30,67 @@ function validatePasswordStrength(password: string): void {
     }
 }
 
-export async function registrarUsuario(nome : string, email: string, senha: string){
-    // Validar força da senha
+export async function registrarProfissional(nome: string, email: string, senha: string) {
     validatePasswordStrength(senha);
-    
-    const senhaHash = await bcrypt.hash(senha, 10); // hash da senha para segurança
+    const senhaHash = await bcrypt.hash(senha, 10);
 
     const usuario = await prisma.usuario.create({
-        data:{
+        data: {
             nome,
             email: email.toLowerCase().trim(),
-            senha: senhaHash
+            senha: senhaHash,
+            role: "PROFISSIONAL"
+        },
+        select: {
+            id: true,
+            nome: true,
+            email: true,
+            role: true
         }
     });
-    return {
-        id : usuario.id,
-        nome : usuario.nome,
-        email : usuario.email,
-        role: usuario.role
-    }
+    return usuario;
+}
+
+export async function registrarFuncionario(nome: string, email: string, senha: string) {
+    validatePasswordStrength(senha);
+    const senhaHash = await bcrypt.hash(senha, 10);
+
+    const usuario = await prisma.usuario.create({
+        data: {
+            nome,
+            email: email.toLowerCase().trim(),
+            senha: senhaHash,
+            role: "FUNCIONARIO"
+        },
+        select: {
+            id: true,
+            nome: true,
+            email: true,
+            role: true
+        }
+    });
+    return usuario;
+}
+
+export async function registrarPaciente(nome: string, idade: number, email: string, senha: string) {
+    validatePasswordStrength(senha);
+    const senhaHash = await bcrypt.hash(senha, 10);
+
+    const paciente = await prisma.paciente.create({
+        data: {
+            name: nome,
+            idade: idade,
+            email: email.toLowerCase().trim(),
+            senha: senhaHash
+        },
+        select: {
+            id: true,
+            name: true,
+            email: true,
+            idade: true
+        }
+    });
+    return paciente;
 }
 
 export async function login(email: string, senha: string){
@@ -64,25 +101,30 @@ export async function login(email: string, senha: string){
                 equals: cleanEmail,
                 mode: 'insensitive'
             }
+        },
+        select: {
+            id: true,
+            email: true,
+            nome: true,
+            senha: true,
+            role: true
         }
     })
-    
-    // Mensagem genérica para evitar enumeração de usuários
+
     if (!usuario) {
         throw new Error('Email ou senha incorretos');
     }
-    
+
     const senhaValida = await bcrypt.compare(senha, usuario.senha);
-    
+
     if(!senhaValida){
         throw new Error('Email ou senha incorretos');
     }
-    
+
     if (!process.env.JWT_SECRET) {
         throw new Error('JWT_SECRET não definido no .env');
     }
 
-    // Gerar access token (curta duração)
     const accessToken = jwt.sign(
         {
             id : usuario.id,
@@ -94,8 +136,7 @@ export async function login(email: string, senha: string){
             expiresIn: "15m"
         }
     );
-    
-    // Gerar refresh token (longa duração)
+
     const refreshToken = jwt.sign(
         {
             id : usuario.id,
@@ -107,11 +148,10 @@ export async function login(email: string, senha: string){
             expiresIn: "7d"
         }
     );
-    
-    // Salvar refresh token no banco de dados
+
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
-    
+
     await prisma.refreshToken.create({
         data: {
             token: refreshToken,
@@ -119,7 +159,7 @@ export async function login(email: string, senha: string){
             expiresAt
         }
     });
-    
+
     return {
         accessToken,
         refreshToken,
@@ -140,20 +180,25 @@ export async function loginPaciente(email: string, senha: string){
                 equals: cleanEmail,
                 mode: 'insensitive'
             }
+        },
+        select: {
+            id: true,
+            name: true,
+            email: true,
+            senha: true
         }
     })
-    
+
     if (!paciente || !paciente.senha) {
         throw new Error('Email ou senha incorretos');
     }
-    
-    // Assumimos que a senha do paciente também seja hash do bcrypt
+
     const senhaValida = await bcrypt.compare(senha, paciente.senha);
-    
+
     if(!senhaValida){
         throw new Error('Email ou senha incorretos');
     }
-    
+
     if (!process.env.JWT_SECRET) {
         throw new Error('JWT_SECRET não definido no .env');
     }
@@ -169,7 +214,7 @@ export async function loginPaciente(email: string, senha: string){
             expiresIn: "15m"
         }
     );
-    
+
     const refreshToken = jwt.sign(
         {
             id : paciente.id,
@@ -181,10 +226,6 @@ export async function loginPaciente(email: string, senha: string){
             expiresIn: "7d"
         }
     );
-    
-    // Nota: Atualmente não temos tabela RefreshToken ligada ao Paciente. 
-    // Para simplificar, o paciente pode não ter refresh token persistido no banco, ou precisamos adicionar isso no schema depois se necessário.
-    // Vamos apenas retornar os tokens por enquanto.
 
     return {
         accessToken,
@@ -208,7 +249,7 @@ export async function refreshAccessToken(refreshToken: string) {
 
     try {
         // Verificar se o token é válido
-        const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET as string) as JwtPayload;
+        const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET as string) as TokenPayload;
         
         // Verificar se o refresh token existe no banco e não expirou
         const storedToken = await prisma.refreshToken.findUnique({
