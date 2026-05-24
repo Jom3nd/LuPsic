@@ -34,22 +34,28 @@ model Usuario {
   agendamentos Agendamento[]
 }
 
-model Agendamento{
-  id             Int      @id @default(autoincrement())
-  dataHoraInicio DateTime
-  observacao     String?
-  status         StatusAgendamento @default(PENDENTE)
+model Agendamento {
+  id              Int      @id @default(autoincrement())
+  dataHoraInicio  DateTime
+  dataHoraFim     DateTime
 
-  usuarioId      Int
-  pacienteId     Int
+  observacao      String?
+  status          StatusAgendamento @default(PENDENTE)
 
-  usuario        Usuario  @relation(fields: [usuarioId], references: [id])
-  paciente       Paciente @relation(fields: [pacienteId], references: [id])
+  usuarioId       Int
+  pacienteId      Int
+  salaId          Int
+
+  usuario         Usuario  @relation(fields: [usuarioId], references: [id])
+  paciente        Paciente @relation(fields: [pacienteId], references: [id])
+  sala            Sala     @relation(fields: [salaId], references: [id])
 }
 model Sala{
   id             Int @id
+  nome           String @unique
   numeroDaSala   Int
   situacao       Boolean @default(true)
+  agendamentos Agendamento[]
 }
 
 model RefreshToken {
