@@ -20,6 +20,7 @@ export async function criarUsuario(req: Request, res: Response) {
     }
 }
 
+
 export async function listarUsuarios(req: AuthRequest, res: Response) {
     try {
         const userId = req.user?.id;
