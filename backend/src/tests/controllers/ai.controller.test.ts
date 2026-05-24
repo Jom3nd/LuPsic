@@ -5,6 +5,9 @@ jest.mock("../../auth/auth.middleware", () => ({
     autenticarToken: (req: any, res: any, next: any) => {
         req.user = { id: 1 };
         next();
+    },
+    requireMaster: (req: any, res: any, next: any) => {
+        next();
     }
 }));
 
