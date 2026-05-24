@@ -1,12 +1,14 @@
 import prisma from "../lib/prisma";
 
-export async function criarAgendamento(dataHoraInicio: string, observacao: string, usuarioId: number, pacienteId: number) {
+export async function criarAgendamento(dataHoraInicio: string, dataHoraFim: string, observacao: string, usuarioId: number, pacienteId: number, salaId: number) {
     return prisma.agendamento.create({
         data: {
             dataHoraInicio: new Date(dataHoraInicio),
+            dataHoraFim: new Date(dataHoraFim),
             observacao,
             usuarioId: Number(usuarioId),
             pacienteId: Number(pacienteId),
+            salaId: Number(salaId),
             status: "PENDENTE"
         }
     });

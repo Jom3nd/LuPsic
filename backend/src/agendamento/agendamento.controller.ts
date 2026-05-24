@@ -4,7 +4,7 @@ import * as agendamentoService from "./agendamento.service";
 
 export async function criarAgendamento(req: AuthRequest, res: Response) {
     try {
-        const { dataHoraInicio, observacao, usuarioId } = req.body;
+        const { dataHoraInicio, dataHoraFim, observacao, usuarioId, salaId } = req.body;
         
         const pacienteId = req.user?.id; 
 
@@ -14,9 +14,11 @@ export async function criarAgendamento(req: AuthRequest, res: Response) {
 
         const agendamento = await agendamentoService.criarAgendamento(
             dataHoraInicio, 
+            dataHoraFim,
             observacao, 
             usuarioId, 
-            pacienteId
+            pacienteId,
+            salaId
         );
 
         return res.status(201).json(agendamento);
