@@ -13,7 +13,7 @@ export async function listarSalas(req: Request, res: Response) {
 export async function criarSala(req: Request, res: Response) {
     try {
         const { id, nome, numeroDaSala } = req.body;
-        const sala = await salaService.criarSala(id, nome, numeroDaSala);
+        const sala = await salaService.criarSala(Number(id), nome, Number(numeroDaSala));
         return res.status(201).json(sala);
     } catch (error: any) {
         return res.status(400).json({ error: "Erro ao criar sala", details: error.message });

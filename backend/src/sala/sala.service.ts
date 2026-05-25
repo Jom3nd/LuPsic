@@ -3,6 +3,7 @@ import prisma from "../lib/prisma";
 
 const salaSelect = { 
     id: true,
+    nome: true,
     numeroDaSala: true,
     situacao: true
 };
