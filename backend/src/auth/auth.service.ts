@@ -4,15 +4,6 @@ import jwt from "jsonwebtoken";
 import { Role } from "@prisma/client";
 import { TokenPayload } from "../types";
 
-/**
- * Valida a força da senha
- * Requisitos:
- * - Mínimo 8 caracteres
- * - Pelo menos 1 maiúscula
- * - Pelo menos 1 minúscula
- * - Pelo menos 1 número
- * - Pelo menos 1 caractere especial (!@#$%^&*)
- */
 function validatePasswordStrength(password: string): void {
     if (password.length < 8) {
         throw new Error('Senha deve ter no mínimo 8 caracteres');
@@ -94,7 +85,7 @@ export async function registrarFuncionario(nome: string, email: string, senha: s
 export async function registrarPaciente(nome: string, idade: number, email: string, senha: string) {
     const cleanEmail = email.toLowerCase().trim();
 
-    const exists = await prisma.paciente.findUnique({ where: { email: cleanEmail } });
+    const exists = await prisma.usuario.findUnique({ where: { email: cleanEmail } });
     if (exists) {
         throw new Error("Email ja cadastrado");
     }
@@ -102,23 +93,35 @@ export async function registrarPaciente(nome: string, idade: number, email: stri
     validatePasswordStrength(senha);
     const senhaHash = await bcrypt.hash(senha, 10);
 
-    const paciente = await prisma.paciente.create({
-        data: {
-            name: nome,
-            idade: idade,
-            email: cleanEmail,
-            senha: senhaHash
-        },
-        select: {
-            id: true,
-            name: true,
-            email: true,
-            idade: true
-        }
-    });
+    return await prisma.$transaction(async (tx) => {
+        // 1. Cria a conta de acesso global
+        const usuario = await tx.usuario.create({
+            data: {
+                nome,
+                email: cleanEmail,
+                senha: senhaHash,
+                role: Role.PACIENTE
+            }
+        });
 
-    console.log(`[AUDITORIA] Paciente registrado | email: ${cleanEmail} | em: ${new Date().toISOString()}`);
-    return paciente;
+        // 2. Cria o registro clínico apontando para o usuário criado acima
+        const paciente = await tx.paciente.create({
+            data: {
+                idade: Number(idade),
+                usuarioId: usuario.id
+            }
+        });
+
+        console.log(`[AUDITORIA] Paciente registrado | email: ${cleanEmail} | em: ${new Date().toISOString()}`);
+        
+        return {
+            id: paciente.id,
+            usuarioId: usuario.id,
+            nome: usuario.nome,
+            email: usuario.email,
+            idade: paciente.idade
+        };
+    });
 }
 
 export async function login(email: string, senha: string){
@@ -160,9 +163,7 @@ export async function login(email: string, senha: string){
             role: usuario.role
         },
         process.env.JWT_SECRET as string,
-        {
-            expiresIn: "15m"
-        }
+        { expiresIn: "15m" }
     );
 
     const refreshToken = jwt.sign(
@@ -172,9 +173,7 @@ export async function login(email: string, senha: string){
             role: usuario.role
         },
         process.env.JWT_SECRET as string,
-        {
-            expiresIn: "7d"
-        }
+        { expiresIn: "7d" }
     );
 
     const expiresAt = new Date();
@@ -202,26 +201,24 @@ export async function login(email: string, senha: string){
 
 export async function loginPaciente(email: string, senha: string){
     const cleanEmail = email.trim();
-    const paciente = await prisma.paciente.findFirst({
+    const usuarioPaciente = await prisma.usuario.findFirst({
         where : {
             email: {
                 equals: cleanEmail,
                 mode: 'insensitive'
-            }
+            },
+            role: Role.PACIENTE 
         },
-        select: {
-            id: true,
-            name: true,
-            email: true,
-            senha: true
+        include: {
+            pacientes: true // Traz a relação para pegarmos o id clínico do paciente
         }
     })
 
-    if (!paciente || !paciente.senha) {
+    if (!usuarioPaciente || !usuarioPaciente.pacientes || usuarioPaciente.pacientes.length === 0) {
         throw new Error('Email ou senha incorretos');
     }
 
-    const senhaValida = await bcrypt.compare(senha, paciente.senha);
+    const senhaValida = await bcrypt.compare(senha, usuarioPaciente.senha);
 
     if(!senhaValida){
         throw new Error('Email ou senha incorretos');
@@ -233,53 +230,45 @@ export async function loginPaciente(email: string, senha: string){
 
     const accessToken = jwt.sign(
         {
-            id : paciente.id,
-            email : paciente.email,
+            id : usuarioPaciente.id,
+            email : usuarioPaciente.email,
             role: "PACIENTE"
         },
         process.env.JWT_SECRET as string,
-        {
-            expiresIn: "15m"
-        }
+        { expiresIn: "15m" }
     );
 
     const refreshToken = jwt.sign(
         {
-            id : paciente.id,
-            email : paciente.email,
+            id : usuarioPaciente.id,
+            email : usuarioPaciente.email,
             role: "PACIENTE"
         },
         process.env.JWT_SECRET as string,
-        {
-            expiresIn: "7d"
-        }
+        { expiresIn: "7d" }
     );
 
     return {
         accessToken,
         refreshToken,
         user: {
-            id: paciente.id,
-            nome: paciente.name,
-            email: paciente.email,
+            id: usuarioPaciente.pacientes[0].id, // ID clínico da tabela Paciente
+            usuarioId: usuarioPaciente.id,   // ID de autenticação
+            nome: usuarioPaciente.nome,
+            email: usuarioPaciente.email,
             role: "PACIENTE"
         }
     };
 }
 
-/**
- * Valida e renova o refresh token
- */
 export async function refreshAccessToken(refreshToken: string) {
     if (!process.env.JWT_SECRET) {
         throw new Error('JWT_SECRET não definido no .env');
     }
 
     try {
-        // Verificar se o token é válido
         const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET as string) as TokenPayload;
         
-        // Verificar se o refresh token existe no banco e não expirou
         const storedToken = await prisma.refreshToken.findUnique({
             where: { token: refreshToken }
         });
@@ -288,7 +277,6 @@ export async function refreshAccessToken(refreshToken: string) {
             throw new Error('Refresh token inválido ou expirado');
         }
 
-        // Gerar novo access token
         const newAccessToken = jwt.sign(
             {
                 id: decoded.id,
@@ -296,23 +284,18 @@ export async function refreshAccessToken(refreshToken: string) {
                 role: decoded.role
             },
             process.env.JWT_SECRET as string,
-            {
-                expiresIn: "15m"
-            }
+            { expiresIn: "15m" }
         );
 
         return {
             accessToken: newAccessToken,
-            refreshToken // O refresh token permanece o mesmo
+            refreshToken
         };
     } catch (error) {
         throw new Error('Falha ao renovar token');
     }
 }
 
-/**
- * Revoga o refresh token (logout)
- */
 export async function logout(refreshToken: string) {
     try {
         await prisma.refreshToken.delete({
