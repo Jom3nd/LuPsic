@@ -6,7 +6,23 @@ import Joi from "joi";
 const registerSchema = Joi.object({
     nome: Joi.string().min(2).max(100).required(),
     email: Joi.string().email().required(),
-    senha: Joi.string().min(8).required()
+    senha: Joi.string()
+        .min(8)
+        .pattern(/[A-Z]/, 'maiúscula')
+        .pattern(/[a-z]/, 'minúscula')
+        .pattern(/[0-9]/, 'número')
+        .pattern(/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/, 'especial')
+        .required()
+        .messages({
+            'string.pattern.name': 'Senha deve conter pelo menos uma letra/caractere {#name}'
+        })
+});
+
+const registerPacienteSchema = Joi.object({
+    nome: Joi.string().min(2).max(100).required(),
+    email: Joi.string().email().required(),
+    senha: Joi.string().min(8).required(),
+    idade: Joi.number().integer().min(1).max(150).required()
 });
 
 const loginSchema = Joi.object({
@@ -14,11 +30,10 @@ const loginSchema = Joi.object({
     senha: Joi.string().required()
 });
 
-export async function registrarUsuario(req: Request, res: Response) {
+export async function registrarProfissional(req: Request, res: Response) {
     try {
         const { nome, email, senha } = req.body;
 
-        // Validar inputs com Joi
         const { error, value } = registerSchema.validate({ nome, email, senha });
         if (error) {
             return res.status(400).json({
@@ -26,16 +41,46 @@ export async function registrarUsuario(req: Request, res: Response) {
             });
         }
 
-        const user = await authService.registrarUsuario(value.nome, value.email, value.senha);
+        const user = await authService.registrarProfissional(value.nome, value.email, value.senha);
+
+        const master = (req as any).user;
+        console.log(`[AUDITORIA] MASTER id=${master?.id} (${master?.email}) registrou profissional: ${value.email}`);
 
         return res.status(201).json({
-            message: "Usuário registrado com sucesso",
+            message: "Profissional registrado com sucesso",
+            user
+        });
+
+    } catch (error) {
+        const message = error instanceof Error ? error.message : "Erro ao registrar profissional";
+        return res.status(400).json({ error: message });
+    }
+}
+
+export async function registrarFuncionario(req: Request, res: Response) {
+    try {
+        const { nome, email, senha } = req.body;
+
+        const { error, value } = registerSchema.validate({ nome, email, senha });
+        if (error) {
+            return res.status(400).json({
+                error: error.details[0].message
+            });
+        }
+
+        const user = await authService.registrarFuncionario(value.nome, value.email, value.senha);
+
+        const master = (req as any).user;
+        console.log(`[AUDITORIA] MASTER id=${master?.id} (${master?.email}) registrou funcionario: ${value.email}`);
+
+        return res.status(201).json({
+            message: "Funcionário registrado com sucesso",
             user
         });
 
     } catch (error: any) {
         return res.status(400).json({
-            error: error.message || "Erro ao registrar usuário"
+            error: error.message || "Erro ao registrar funcionário"
         });
     }
 }
@@ -75,8 +120,49 @@ export async function login(req: Request, res: Response) {
         });
 
     } catch (error: any) {
+        console.error("Erro no login:", error);
         return res.status(400).json({
-            error: "Email ou senha incorretos"
+            error: error.message || "Email ou senha incorretos"
+        });
+    }
+}
+
+export async function loginPaciente(req: Request, res: Response) {
+    try {
+        const { email, senha } = req.body;
+
+        const { error, value } = loginSchema.validate({ email, senha });
+        if (error) {
+            return res.status(400).json({
+                error: error.details[0].message
+            });
+        }
+
+        const data = await authService.loginPaciente(value.email, value.senha);
+
+        res.cookie('accessToken', data.accessToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 15 * 60 * 1000 // 15 minutos
+        });
+
+        res.cookie('refreshToken', data.refreshToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 dias
+        });
+
+        return res.json({
+            message: 'Autenticado com sucesso',
+            user: data.user
+        });
+
+    } catch (error: any) {
+        console.error("Erro no login de paciente:", error);
+        return res.status(400).json({
+            error: error.message || "Email ou senha incorretos"
         });
     }
 }
@@ -111,6 +197,31 @@ export async function refreshToken(req: Request, res: Response) {
     } catch (error: any) {
         return res.status(401).json({
             error: "Falha ao renovar token"
+        });
+    }
+}
+
+export async function registrarPaciente(req: Request, res: Response) {
+    try {
+        const { nome, email, senha, idade } = req.body;
+
+        const { error, value } = registerPacienteSchema.validate({ nome, email, senha, idade });
+        if (error) {
+            return res.status(400).json({
+                error: error.details[0].message
+            });
+        }
+
+        const paciente = await authService.registrarPaciente(value.nome,value.idade, value.email, value.senha);
+
+        return res.status(201).json({
+            message: "Paciente registrado com sucesso",
+            paciente
+        });
+
+    } catch (error: any) {
+        return res.status(400).json({
+            error: error.message || "Erro ao registrar paciente"
         });
     }
 }

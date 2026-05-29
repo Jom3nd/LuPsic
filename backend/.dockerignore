@@ -6,3 +6,4 @@ Dockerfile
 .git
 .gitignore
 npm-debug.log
+src/prisma/update-master-password.ts

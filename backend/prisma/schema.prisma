@@ -6,17 +6,72 @@ datasource db {
   provider = "postgresql"
 }
 
+enum Role {
+  MASTER
+  PROFISSIONAL
+  FUNCIONARIO
+  PACIENTE
+}
+
+enum StatusAgendamento {
+  PENDENTE
+  CONFIRMADO
+  CANCELADO
+}
+
+enum StatusSala {
+  ATIVA
+  INATIVA
+  MANUTENCAO
+  LIMPEZA
+}
+
 model Usuario {
-  id            Int              @id @default(autoincrement())
-  nome          String
-  email         String           @unique
-  senha         String
-  criadoEm      DateTime         @default(now())
+  id       Int      @id @default(autoincrement())
+  nome     String
+  email    String   @unique
+  senha    String
+  role     Role     @default(PROFISSIONAL)
+  criadoEm DateTime @default(now())
 
   pacientes     Paciente[]
   sessoes       Sessao[]
   respostas     IAResponse[]
   refreshTokens RefreshToken[]
+  agendamentos  Agendamento[]
+}
+
+model Agendamento {
+  id             Int               @id @default(autoincrement())
+  dataHoraInicio DateTime
+  dataHoraFim    DateTime
+  observacao     String?
+  status         StatusAgendamento @default(PENDENTE)
+
+  usuarioId  Int
+  pacienteId Int
+  salaId     Int
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  usuario  Usuario  @relation(fields: [usuarioId], references: [id])
+  paciente Paciente @relation(fields: [pacienteId], references: [id])
+  sala     Sala     @relation(fields: [salaId], references: [id])
+  sessao   Sessao?
+
+  // Índices para otimizar consultas na agenda
+  @@index([usuarioId, dataHoraInicio])
+  @@index([salaId, dataHoraInicio])
+}
+
+model Sala {
+  id           Int           @id @default(autoincrement())
+  nome         String        @unique
+  numeroDaSala Int           @unique
+  situacao     StatusSala    @default(ATIVA)
+  atualizadoEm DateTime      @updatedAt
+  agendamentos Agendamento[]
 }
 
 model RefreshToken {
@@ -26,49 +81,60 @@ model RefreshToken {
   usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
   expiresAt DateTime
   createdAt DateTime @default(now())
-  
+
   @@index([usuarioId])
 }
 
 model Paciente {
-  id         Int      @id @default(autoincrement())
-  name       String
-  idade      Int
+  id    Int @id @default(autoincrement())
+  idade Int
+  // Removidos: nome, email e senha (agora herda do Usuario)
 
-  usuarioId  Int?
-  usuario    Usuario?  @relation(fields: [usuarioId], references: [id])
+  usuarioId Int?     @unique
+  usuario   Usuario? @relation(fields: [usuarioId], references: [id])
 
-  sessoes    Sessao[]
-  respostas  IAResponse[]
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  sessoes      Sessao[]
+  respostas    IAResponse[]
+  agendamentos Agendamento[]
 }
 
 model Sessao {
-  id              Int      @id @default(autoincrement())
-  dataHoraInicio  DateTime
-  observacao      String?
+  id             Int      @id @default(autoincrement())
+  dataHoraInicio DateTime
+  status         String   @default("REALIZADA")
+  observacao     String? // Criptografar no código
 
-  usuarioId       Int
-  pacienteId      Int
+  agendamentoId Int?         @unique
+  agendamento   Agendamento? @relation(fields: [agendamentoId], references: [id])
 
-  usuario         Usuario  @relation(fields: [usuarioId], references: [id])
-  paciente        Paciente @relation(fields: [pacienteId], references: [id])
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
 
-  respostas       IAResponse[]
+  usuarioId  Int
+  pacienteId Int
+
+  usuario  Usuario  @relation(fields: [usuarioId], references: [id])
+  paciente Paciente @relation(fields: [pacienteId], references: [id])
+
+  respostas IAResponse[]
 }
 
 model IAResponse {
-  id          Int      @id @default(autoincrement())
-  tipo        String
-  modelo      String
-  prompt      String
-  resposta    String
-  criadoEm    DateTime @default(now())
+  id       Int      @id @default(autoincrement())
+  tipo     String
+  modelo   String
+  prompt   String
+  resposta String
+  criadoEm DateTime @default(now())
 
-  usuarioId   Int
-  pacienteId  Int?
-  sessaoId    Int?
+  usuarioId  Int
+  pacienteId Int?
+  sessaoId   Int?
 
-  usuario     Usuario  @relation(fields: [usuarioId], references: [id])
-  paciente    Paciente? @relation(fields: [pacienteId], references: [id])
-  sessao      Sessao?   @relation(fields: [sessaoId], references: [id])
+  usuario  Usuario   @relation(fields: [usuarioId], references: [id])
+  paciente Paciente? @relation(fields: [pacienteId], references: [id])
+  sessao   Sessao?   @relation(fields: [sessaoId], references: [id])
 }

@@ -31,3 +31,15 @@ export function autenticarToken(req: AuthRequest, res: Response, next: NextFunct
         return res.status(401).json({ error: "Token inválido" });
     }
 }
+
+export function requireMaster(req: AuthRequest, res: Response, next: NextFunction) {
+    if (!req.user) {
+        return res.status(401).json({ error: "Usuário não autenticado" });
+    }
+
+    if (req.user.role !== "MASTER") {
+        return res.status(403).json({ error: "Acesso negado." });
+    }
+
+    return next();
+}
