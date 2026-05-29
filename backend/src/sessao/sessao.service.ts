@@ -32,34 +32,64 @@ function interpretarDataTexto(texto: string): Date {
     throw new Error("Data inválida");
 }
 
+interface CriarSessaoDTO {
+    pacienteId: number;
+    dataTexto?: string;
+    data?: string | Date;
+    observacao?: string;
+    agendamentoId?: number; // Vinculo novo opcional
+}
 
-export async function criarSessao(data: any, userId: number) {
+interface AtualizarSessaoDTO {
+    dataTexto?: string;
+    data?: string | Date;
+    observacao?: string;
+    pacienteId?: number;
+}
+
+
+export async function criarSessao(data: CriarSessaoDTO, profissionalId: number) {
     if (!data.pacienteId) {
         throw new Error("Paciente obrigatório");
     }
 
     // Verificar se o paciente pertence ao usuário
-    const paciente = await prisma.paciente.findFirst({
+    const paciente = await prisma.paciente.findUnique({
         where: {
-            id: Number(data.pacienteId),
-            usuarioId: userId
+            id: Number(data.pacienteId)
         }
     });
 
-    if (!paciente) {
-        throw new Error("Paciente não encontrado ou acesso negado");
+    // Se houver um agendamentoId opcional, pode atualizar o agendamento em paralelo
+    if (data.agendamentoId) {
+        await prisma.agendamento.update({
+            where: { id: Number(data.agendamentoId) },
+            data: { status: "CONFIRMADO" } // Se iniciou/criou a sessão, confirma a agenda
+        });
     }
 
-    const dataFinal = interpretarDataTexto(
-        data.dataTexto || data.data
-    );
+    if (!paciente) {
+        throw new Error("Paciente não encontrado");
+    }
+    const dataOriginal = data.dataTexto || data.data;
+    const dataFinal = dataOriginal ? interpretarDataTexto(String(dataOriginal)) : new Date();
+
 
     return await prisma.sessao.create({
         data: {
             dataHoraInicio: dataFinal,
             observacao: data.observacao ?? null,
             pacienteId: Number(data.pacienteId),
-            usuarioId: userId
+            usuarioId: profissionalId,
+            agendamentoId: data.agendamentoId ? Number(data.agendamentoId) : null
+        },
+
+        include: {
+            paciente: {
+                include: {
+                    usuario: {select:{nome: true}}
+                }
+            }
         }
     });
 }
@@ -68,7 +98,11 @@ export async function listarSessoes(userId: number) {
     return await prisma.sessao.findMany({
         where: { usuarioId: userId },
         include: {
-            paciente: true
+            paciente: {
+                include: {
+                    usuario: {select:{nome: true}}
+                }
+            }
         },
         orderBy: {
             dataHoraInicio: "asc"
@@ -76,33 +110,51 @@ export async function listarSessoes(userId: number) {
     });
 }
 
-export async function getSessaoById(id: number, userId: number) {
+export async function getSessaoById(id: number, profissionalId: number) {
     return await prisma.sessao.findFirst({
         where: {
             id: Number(id),
-            usuarioId: userId
+            usuarioId: profissionalId
         },
         include: {
-            paciente: true
+            paciente: {
+                include: {
+                    usuario: { select: { nome: true } }
+                }
+            },
+            respostas: true // Traz também as respostas de IA atreladas
         }
     });
 }
 
-export async function atualizarSessao(id: number, data: any, userId: number) {
-    // Verificar se a sessão pertence ao usuário
-    const sessaoExistente = await getSessaoById(id, userId);
+export async function atualizarSessao(id: number, data: AtualizarSessaoDTO, profissionalId: number) {
+    // 1. Verificar se a sessão existe e pertence ao profissional logado
+    const sessaoExistente = await getSessaoById(id, profissionalId);
     if (!sessaoExistente) throw new Error("Sessão não encontrada ou acesso negado");
 
-    const dataFinal = interpretarDataTexto(
-        data.dataTexto || data.data
-    );
+    // 2. Trata a data de forma segura se ela foi enviada, caso contrário mantém a atual
+    const dataOriginal = data.dataTexto || data.data;
+    const dataFinal = dataOriginal ? interpretarDataTexto(String(dataOriginal)) : sessaoExistente.dataHoraInicio;
 
+    // 3. Atualiza no banco mapeando os tipos corretamente
     return await prisma.sessao.update({
         where: { id: Number(id) },
         data: {
             dataHoraInicio: dataFinal,
-            observacao: data.observacao ?? null,
+            // Se vier undefined (não enviado), o Prisma ignora o campo. Se vier null ou string, ele aplica.
+            observacao: data.observacao !== undefined ? data.observacao : sessaoExistente.observacao,
             pacienteId: data.pacienteId ? Number(data.pacienteId) : undefined
+        },
+        include: {
+            paciente: {
+                include: {
+                    usuario: {
+                        select: {
+                            nome: true
+                        }
+                    }
+                }
+            }
         }
     });
 }

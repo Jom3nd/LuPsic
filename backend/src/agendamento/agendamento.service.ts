@@ -1,3 +1,4 @@
+import { StatusAgendamento } from "@prisma/client";
 import prisma from "../lib/prisma";
 
 const EMAIL_SALA_PRIVADA = process.env.EMAIL_ADDRESS;
@@ -5,8 +6,8 @@ const EMAIL_SALA_PRIVADA = process.env.EMAIL_ADDRESS;
 export async function criarAgendamento(dataHoraInicio: string, dataHoraFim: string, observacao: string, usuarioId: number, pacienteId: number, salaId: number) {
     // 1. Busca os detalhes da sala e do usuário simultaneamente para validação
     const [sala, usuario] = await Promise.all([
-        prisma.sala.findUnique({ where: { id: Number(salaId) } }),
-        prisma.usuario.findUnique({ where: { id: Number(usuarioId) } })
+        prisma.sala.findUnique({ where: { id: (salaId) } }),
+        prisma.usuario.findUnique({ where: { id: (usuarioId) } })
     ]);
 
     if (!sala) throw new Error("Sala não encontrada no sistema.");
@@ -24,8 +25,11 @@ export async function criarAgendamento(dataHoraInicio: string, dataHoraFim: stri
     }
 
     // 3. Validação da Sala 05 (Resiliência) - Almoxarifado
-    if (sala.numeroDaSala === 5 && !sala.situacao) {
+    if (sala.numeroDaSala === 5 && sala.situacao === "INATIVA") {
         throw new Error("Agendamento bloqueado: A Sala 05 está atualmente configurada como almoxarifado.");
+    }
+    if (sala.situacao !== "ATIVA") {
+        throw new Error(`Agendamento bloqueado: Esta sala está com status de ${sala.situacao}.`);
     }
 
     // 4. Validação de Conflito de Horários (Ignora bloqueio se for a Sala 09)
@@ -36,11 +40,9 @@ export async function criarAgendamento(dataHoraInicio: string, dataHoraFim: stri
                 status: {
                     not: "CANCELADO"
                 },
-                OR: [
-                    {
-                        dataHoraInicio: { lt: new Date(dataHoraFim) },
-                        dataHoraFim: { gt: new Date(dataHoraInicio) }
-                    }
+                AND: [
+                    { dataHoraInicio: { lt: new Date(dataHoraFim) } },
+                    { dataHoraFim: { gt: new Date(dataHoraInicio) } }
                 ]
             }
         });
@@ -50,15 +52,14 @@ export async function criarAgendamento(dataHoraInicio: string, dataHoraFim: stri
         }
     }
 
-    // 5. Tudo certo! Cria o agendamento no banco.
     return prisma.agendamento.create({
         data: {
             dataHoraInicio: new Date(dataHoraInicio),
             dataHoraFim: new Date(dataHoraFim),
             observacao,
-            usuarioId: Number(usuarioId),
-            pacienteId: Number(pacienteId),
-            salaId: Number(salaId),
+            usuarioId: (usuarioId),
+            pacienteId: (pacienteId),
+            salaId: (salaId),
             status: "PENDENTE"
         }
     });
@@ -69,19 +70,22 @@ export async function listarAgendamentosPorRole(role: string, userId: number) {
     // sempre venham juntos na consulta, trazendo seus respectivos nomes.
     const inclusaoPadrao = {
         paciente: {
-            select: {
-                name: true // Traz apenas o nome do paciente (ajuste para 'nome' se mudou no banco, mas seu schema diz 'name')
+            include: {
+                usuario: {
+                    select: {
+                        nome: true // O nome agora mora na tabela Usuario
+                    }
+                }
             }
         },
         sala: {
             select: {
-                nome: true // Traz o nome da sala (Ex: "Sala 01 — Compaixão")
+                nome: true 
             }
         }
     };
 
     if (role === "MASTER" || role === "FUNCIONARIO") {
-        // Master e Funcionário veem tudo, incluindo também os dados do profissional (usuario) se necessário
         return prisma.agendamento.findMany({
             include: {
                 ...inclusaoPadrao,
@@ -92,20 +96,23 @@ export async function listarAgendamentosPorRole(role: string, userId: number) {
             orderBy: { dataHoraInicio: 'asc' }
         });
     } else if (role === "PROFISSIONAL") {
-        // O profissional vê apenas os seus próprios agendamentos
         return prisma.agendamento.findMany({
             where: { usuarioId: userId },
             include: inclusaoPadrao,
             orderBy: { dataHoraInicio: 'asc' }
         });
     } else {
-        // Se for paciente, vê apenas os seus agendamentos e traz junto o nome do profissional
+        // Se for PACIENTE: O userId recebido do login bate com o 'usuarioId' da tabela Paciente
         return prisma.agendamento.findMany({
-            where: { pacienteId: userId },
+            where: { 
+                paciente: {
+                    usuarioId: userId // Garante o filtro correto para o paciente logado
+                }
+            },
             include: {
                 ...inclusaoPadrao,
                 usuario: {
-                    select: { nome: true } // Nome do profissional para o paciente saber com quem vai se consultar
+                    select: { nome: true } // Nome do profissional atendente
                 }
             },
             orderBy: { dataHoraInicio: 'asc' }
@@ -113,7 +120,7 @@ export async function listarAgendamentosPorRole(role: string, userId: number) {
     }
 }
 
-export async function atualizarStatusAgendamento(id: number, status: "PENDENTE" | "CONFIRMADO" | "CANCELADO") {
+export async function atualizarStatusAgendamento(id: number, status: StatusAgendamento) {
     return prisma.agendamento.update({
         where: { id },
         data: { status }
