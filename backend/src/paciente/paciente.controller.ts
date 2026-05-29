@@ -3,14 +3,14 @@ import * as pacienteService from './paciente.service';
 import { AuthRequest } from '../types';
 
 interface CriarPacienteDTO {
-    name: string;
-    email?: string;
+    nome: string;
+    email: string;
     senha?: string;
     idade: number;
 }
 
 interface AtualizarPacienteDTO {
-    name?: string;
+    nome?: string;
     email?: string;
     senha?: string;
     idade?: number;
@@ -47,7 +47,7 @@ export async function getPacienteById(req: AuthRequest, res: Response) {
         const userId = req.user?.id;
         if (!userId) return res.status(401).json({ error: 'Não autorizado' });
 
-        const paciente = await pacienteService.getPacienteById(id, userId);
+        const paciente = await pacienteService.getPacienteById(id);
         if (!paciente) return res.status(404).json({ error: 'Paciente não encontrado' });
 
         return res.status(200).json(paciente);
@@ -76,7 +76,7 @@ export async function deletarPaciente(req: AuthRequest, res: Response) {
         const userId = req.user?.id;
         if (!userId) return res.status(401).json({ error: 'Não autorizado' });
 
-        await pacienteService.deletarPaciente(id, userId);
+        await pacienteService.deletarPaciente(id);
         return res.status(204).send();
     } catch (error: any) {
         return res.status(400).json({ error: error.message || 'Erro ao deletar paciente' });
