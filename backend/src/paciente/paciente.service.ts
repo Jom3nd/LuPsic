@@ -1,5 +1,3 @@
-import { Prisma } from "@prisma/client";
-import { Request, Response } from "express";
 import prisma from "../lib/prisma";
 import bcrypt from "bcrypt";
 
@@ -34,6 +32,7 @@ export async function criarPaciente(data: CriarPacienteDTO, userId: number) {
         data: {
             idade: data.idade,
             usuarioId: novoUsuario.id,
+            profissionalId: userId,
         },
         include: { usuario: true }
     });
@@ -42,6 +41,9 @@ export async function criarPaciente(data: CriarPacienteDTO, userId: number) {
 
 export async function listarPacientes(profissionalId: number) {
     return await prisma.paciente.findMany({
+        where: {
+            profissionalId: profissionalId
+        },
         include: {
             usuario: {
                 select: { id: true, nome: true, email: true, role: true }

@@ -52,6 +52,22 @@ export async function criarAgendamento(dataHoraInicio: string, dataHoraFim: stri
         }
     }
 
+    // 5. Validação de Conflito de Horários para o Profissional (independente da sala)
+    const agendamentoConflitanteProfissional = await prisma.agendamento.findFirst({
+        where: {
+            usuarioId: Number(usuarioId),
+            status: { not: "CANCELADO" },
+            AND: [
+                { dataHoraInicio: { lt: new Date(dataHoraFim) } },
+                { dataHoraFim: { gt: new Date(dataHoraInicio) } }
+            ]
+        }
+    });
+
+    if (agendamentoConflitanteProfissional) {
+        throw new Error("Profissional já possui agendamento neste horário em outra sala.");
+    }
+
     return prisma.agendamento.create({
         data: {
             dataHoraInicio: new Date(dataHoraInicio),

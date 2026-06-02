@@ -22,7 +22,7 @@ function validatePasswordStrength(password: string): void {
     }
 }
 
-export async function registrarProfissional(nome: string, email: string, senha: string) {
+export async function registrarProfissional(nome: string, email: string, senha: string, especialidade?: string) {
     const cleanEmail = email.toLowerCase().trim();
 
     const exists = await prisma.usuario.findUnique({ where: { email: cleanEmail } });
@@ -38,12 +38,14 @@ export async function registrarProfissional(nome: string, email: string, senha: 
             nome,
             email: cleanEmail,
             senha: senhaHash,
+            especialidade,
             role: Role.PROFISSIONAL
         },
         select: {
             id: true,
             nome: true,
             email: true,
+            especialidade: true,
             role: true
         }
     });
@@ -124,7 +126,7 @@ export async function registrarPaciente(nome: string, idade: number, email: stri
     });
 }
 
-export async function login(email: string, senha: string){
+export async function login(email: string, senha: string, expectedRole?: string){
     const cleanEmail = email.trim();
     const usuario = await prisma.usuario.findFirst({
         where : {
@@ -144,6 +146,10 @@ export async function login(email: string, senha: string){
 
     if (!usuario) {
         throw new Error('Email ou senha incorretos');
+    }
+
+    if (expectedRole && usuario.role !== expectedRole) {
+        throw new Error('Acesso não autorizado para esta função');
     }
 
     const senhaValida = await bcrypt.compare(senha, usuario.senha);

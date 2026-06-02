@@ -1,16 +1,23 @@
 import { Response } from "express";
 import { AuthRequest } from "../types";
 import * as agendamentoService from "./agendamento.service";
+import prisma from "../lib/prisma"
 
 export async function criarAgendamento(req: AuthRequest, res: Response) {
     try {
         const { dataHoraInicio, dataHoraFim, observacao, usuarioId, salaId } = req.body;
         
-        const pacienteId = req.user?.id; 
+        const authId = req.user?.id; 
 
-        if (!pacienteId || req.user?.role !== "PACIENTE") {
+        if (!authId || req.user?.role !== "PACIENTE") {
             return res.status(401).json({ error: "Apenas pacientes podem solicitar agendamentos nesta rota" });
         }
+
+        const authModel = await prisma.paciente.findUnique({ where: { usuarioId: authId } });
+        if (!authModel) {
+            return res.status(404).json({ error: "Perfil de paciente não encontrado" });
+        }
+        const pacienteId = authModel.id;
 
         const agendamento = await agendamentoService.criarAgendamento(
             dataHoraInicio, 
@@ -23,7 +30,7 @@ export async function criarAgendamento(req: AuthRequest, res: Response) {
 
         return res.status(201).json(agendamento);
     } catch (error: any) {
-        return res.status(400).json({ error: "Erro ao criar agendamento", details: error.message });
+        return res.status(400).json({ error: error.message || "Erro ao criar agendamento" });
     }
 }
 

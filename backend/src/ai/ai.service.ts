@@ -101,11 +101,20 @@ async function executarAcao(parsed: any, userId: number) {
 }
 
 export async function processarIA(mensagem: string, userId: number) {
-    // Buscar pacientes do usuário para dar contexto à IA
-    const pacientes = await prisma.paciente.findMany({
-        where: { usuarioId: userId },
-        select: { id: true, name: true }
+    // Buscar pacientes do profissional para dar contexto à IA
+    const pacientesRaw = await prisma.paciente.findMany({
+        where: { profissionalId: userId },
+        include: {
+            usuario: {
+                select: { nome: true }
+            }
+        }
     });
+
+    const pacientes = pacientesRaw.map(p => ({
+        id: p.id,
+        name: p.usuario?.nome || "Sem Nome"
+    }));
 
     const dataAtual = new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
 
