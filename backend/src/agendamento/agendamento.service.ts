@@ -4,6 +4,21 @@ import prisma from "../lib/prisma";
 const EMAIL_SALA_PRIVADA = process.env.EMAIL_ADDRESS;
 
 export async function criarAgendamento(dataHoraInicio: string, dataHoraFim: string, observacao: string, usuarioId: number, pacienteId: number, salaId: number) {
+    // 0. Validação de horário comercial: apenas das 07:00 às 20:00
+    const inicio = new Date(dataHoraInicio);
+    const horaInicio = inicio.getHours();
+    const minutoInicio = inicio.getMinutes();
+    const fim = new Date(dataHoraFim);
+    const horaFim = fim.getHours();
+    const minutoFim = fim.getMinutes();
+
+    if (horaInicio < 7 || horaInicio >= 20 || (horaInicio === 20 && minutoInicio > 0)) {
+        throw new Error("Agendamentos permitidos apenas das 07:00 às 20:00.");
+    }
+    if (horaFim > 20 || (horaFim === 20 && minutoFim > 0)) {
+        throw new Error("O término do agendamento deve ser até 20:00.");
+    }
+
     // 1. Busca os detalhes da sala e do usuário simultaneamente para validação
     const [sala, usuario] = await Promise.all([
         prisma.sala.findUnique({ where: { id: (salaId) } }),

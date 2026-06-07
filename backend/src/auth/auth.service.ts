@@ -216,11 +216,18 @@ export async function loginPaciente(email: string, senha: string){
             role: Role.PACIENTE 
         },
         include: {
-            pacientes: true // Traz a relação para pegarmos o id clínico do paciente
+            pacientes: true,
+            pacientePerfil: true
         }
     })
 
-    if (!usuarioPaciente || !usuarioPaciente.pacientes || usuarioPaciente.pacientes.length === 0) {
+    if (!usuarioPaciente) {
+        throw new Error('Email ou senha incorretos');
+    }
+
+    const pacienteClinicoId = usuarioPaciente.pacientePerfil?.id || (usuarioPaciente.pacientes && usuarioPaciente.pacientes[0]?.id);
+
+    if (!pacienteClinicoId) {
         throw new Error('Email ou senha incorretos');
     }
 
@@ -258,7 +265,7 @@ export async function loginPaciente(email: string, senha: string){
         accessToken,
         refreshToken,
         user: {
-            id: usuarioPaciente.pacientes[0].id, // ID clínico da tabela Paciente
+            id: pacienteClinicoId, // ID clínico da tabela Paciente
             usuarioId: usuarioPaciente.id,   // ID de autenticação
             nome: usuarioPaciente.nome,
             email: usuarioPaciente.email,
