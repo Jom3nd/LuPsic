@@ -225,10 +225,16 @@ export async function loginPaciente(email: string, senha: string){
         throw new Error('Email ou senha incorretos');
     }
 
-    const pacienteClinicoId = usuarioPaciente.pacientePerfil?.id || (usuarioPaciente.pacientes && usuarioPaciente.pacientes[0]?.id);
+    let pacienteClinicoId = usuarioPaciente.pacientePerfil?.id || (usuarioPaciente.pacientes && usuarioPaciente.pacientes[0]?.id);
 
     if (!pacienteClinicoId) {
-        throw new Error('Email ou senha incorretos');
+        const novoPaciente = await prisma.paciente.create({
+            data: {
+                idade: 0,
+                usuarioId: usuarioPaciente.id
+            }
+        });
+        pacienteClinicoId = novoPaciente.id;
     }
 
     const senhaValida = await bcrypt.compare(senha, usuarioPaciente.senha);
