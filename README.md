@@ -15,14 +15,6 @@ O **Mindful Assistant** é uma plataforma robusta desenvolvida para otimizar o f
 - **Planos Terapêuticos**: Sugestões de abordagens baseadas em evidências.
 - **Chat Clínico**: Assistente inteligente para suporte em diagnósticos e técnicas terapêuticas.
 
-## 🛡️ Segurança e Privacidade (Privacy-First)
-
-Desenvolvido com foco absoluto na proteção de dados sensíveis (LGPD-compliant patterns):
-- **Autenticação Avançada**: Sistema de Access e Refresh Tokens via Cookies HttpOnly.
-- **Criptografia**: Hashes de senha utilizando Bcrypt e validação de complexidade.
-- **Proteção de Infraestrutura**: Implementação de Helmet.js, CORS restrito e Rate Limiting contra ataques de força bruta.
-- **IA Local**: O processamento de dados é feito localmente via Ollama, garantindo que as notas dos pacientes nunca saiam da infraestrutura controlada.
-
 ## 🛠️ Stack Tecnológica
 
 - **Backend**: Node.js, Express, TypeScript.
