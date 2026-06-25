@@ -20,6 +20,8 @@ services:
     restart: always
     ports:
       - "3000:3000"
+    env_file:
+      - ./backend/.env
     environment:
       DATABASE_URL: "postgresql://user:password@db:5432/psicologo_db?schema=public"
       JWT_SECRET: "JWT_SECRET"

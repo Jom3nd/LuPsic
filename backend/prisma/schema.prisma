@@ -31,14 +31,16 @@ model Usuario {
   nome     String
   email    String   @unique
   senha    String
+  especialidade String?
   role     Role     @default(PROFISSIONAL)
   criadoEm DateTime @default(now())
 
-  pacientes     Paciente[]
-  sessoes       Sessao[]
-  respostas     IAResponse[]
-  refreshTokens RefreshToken[]
-  agendamentos  Agendamento[]
+  pacientes      Paciente[]     @relation("ProfissionalPacientes")
+  pacientePerfil Paciente?      @relation("PacienteUsuario")
+  sessoes        Sessao[]
+  respostas      IAResponse[]
+  refreshTokens  RefreshToken[]
+  agendamentos   Agendamento[]
 }
 
 model Agendamento {
@@ -56,7 +58,7 @@ model Agendamento {
   atualizadoEm DateTime @updatedAt
 
   usuario  Usuario  @relation(fields: [usuarioId], references: [id])
-  paciente Paciente @relation(fields: [pacienteId], references: [id])
+  paciente Paciente @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
   sala     Sala     @relation(fields: [salaId], references: [id])
   sessao   Sessao?
 
@@ -91,7 +93,10 @@ model Paciente {
   // Removidos: nome, email e senha (agora herda do Usuario)
 
   usuarioId Int?     @unique
-  usuario   Usuario? @relation(fields: [usuarioId], references: [id])
+  usuario   Usuario? @relation("PacienteUsuario", fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  profissionalId Int?
+  profissional   Usuario? @relation("ProfissionalPacientes", fields: [profissionalId], references: [id])
 
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
@@ -117,7 +122,7 @@ model Sessao {
   pacienteId Int
 
   usuario  Usuario  @relation(fields: [usuarioId], references: [id])
-  paciente Paciente @relation(fields: [pacienteId], references: [id])
+  paciente Paciente @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
 
   respostas IAResponse[]
 }
@@ -135,6 +140,6 @@ model IAResponse {
   sessaoId   Int?
 
   usuario  Usuario   @relation(fields: [usuarioId], references: [id])
-  paciente Paciente? @relation(fields: [pacienteId], references: [id])
+  paciente Paciente? @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
   sessao   Sessao?   @relation(fields: [sessaoId], references: [id])
 }

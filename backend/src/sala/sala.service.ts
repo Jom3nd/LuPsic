@@ -10,7 +10,17 @@ const salaSelect = {
 
 export async function listarSalas() {
     return await prisma.sala.findMany({
-        select: salaSelect
+        select: {
+            ...salaSelect,
+            agendamentos: {
+                include: {
+                    paciente: {
+                        include: { usuario: { select: { nome: true } } }
+                    },
+                    usuario: { select: { nome: true } }
+                }
+            }
+        }
     });
 }
 
@@ -48,7 +58,7 @@ export async function verificarHorarioLivre(dataHoraInicio: Date, dataHoraFim: D
     // Busca salas ativas que NÃO possuem agendamentos conflitantes
     const salasDisponiveis = await prisma.sala.findMany({
         where: {
-            situacao: true,
+            situacao: "ATIVA",
             agendamentos: {
                 none: {
                     status: {

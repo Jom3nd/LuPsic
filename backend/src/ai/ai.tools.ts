@@ -19,19 +19,20 @@ export const tools = [
 }
 ];
 
+import { criarPaciente as criarPacienteService } from "../paciente/paciente.service";
+
 // Funções reais (execução)
 export async function criarPaciente(data: any, userId: number) {
     if (!data.nome || data.idade == null) { // idade pode ser 0, então verificamos null ou undefined
         throw new Error("Dados inválidos para paciente");
     }
 
-    const paciente = await prisma.paciente.create({
-        data: {
-            name: data.nome,
-            idade: data.idade,
-            usuarioId: userId // Associa o paciente ao usuário que o criou
-        },
-    });
+    const email = `${data.nome.toLowerCase().replace(/\s+/g, "")}.${Date.now()}@mindful.com`;
+    const paciente = await criarPacienteService({
+        nome: data.nome,
+        idade: Number(data.idade),
+        email,
+    }, userId);
 
     return {
         tipo: "acao",
@@ -49,7 +50,10 @@ export async function criarSessao(data: any, userId: number) {
     const paciente = await prisma.paciente.findFirst({
         where: {
             id: Number(data.pacienteId),
-            usuarioId: userId
+            profissionalId: userId
+        },
+        include: {
+            usuario: true
         }
     });
 
@@ -75,7 +79,7 @@ export async function criarSessao(data: any, userId: number) {
 
     return {
         tipo: "acao",
-        message: `Sessão agendada para ${paciente.name} em ${dataConvertida.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}`,
+        message: `Sessão agendada para ${paciente.usuario?.nome || "Paciente"} em ${dataConvertida.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}`,
         data: sessao
     };
 }

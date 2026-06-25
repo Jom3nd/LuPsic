@@ -7,15 +7,17 @@ const usuarioSelect = {
     id: true,
     nome: true,
     email: true,
-    criadoEm: true
+    especialidade: true,
+    criadoEm: true,
+    role: true
 };
 
-export async function criarUsuario(data: Prisma.UsuarioCreateInput) {
+export async function criarUsuario(data: Prisma.UsuarioCreateInput & { especialidade?: string }) {
     const hashSenha = await bcrypt.hash(data.senha, 10);
     return await prisma.usuario.create({
         data: {
             ...data,
-            senha: hashSenha
+            senha: hashSenha,
         },
         select: usuarioSelect
     });
@@ -34,11 +36,12 @@ export async function deletarUsuario(id: number) {
     });
 }
 
-export async function atualizarUsuario(id: number, data: { nome?: string, email?: string, senha?: string }) {
+export async function atualizarUsuario(id: number, data: { nome?: string, email?: string, senha?: string, especialidade?: string }) {
     const updateData: Prisma.UsuarioUpdateInput = {};
 
     if (data.nome) updateData.nome = data.nome;
     if (data.email) updateData.email = data.email;
+    if (data.especialidade) updateData.especialidade = data.especialidade;
     if (data.senha) {
         updateData.senha = await bcrypt.hash(data.senha, 10);
     }
@@ -47,5 +50,17 @@ export async function atualizarUsuario(id: number, data: { nome?: string, email?
         where: { id },
         data: updateData,
         select: usuarioSelect
+    });
+}
+
+export async function listarProfissionais() {
+    return await prisma.usuario.findMany({
+        where: { role: "PROFISSIONAL" },
+        select: {
+            id: true,
+            nome: true,
+            email: true,
+            especialidade: true
+        }
     });
 }

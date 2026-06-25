@@ -6,6 +6,7 @@ import Joi from "joi";
 const registerSchema = Joi.object({
     nome: Joi.string().min(2).max(100).required(),
     email: Joi.string().email().required(),
+    especialidade: Joi.string().max(100).optional(),
     senha: Joi.string()
         .min(8)
         .pattern(/[A-Z]/, 'maiúscula')
@@ -27,21 +28,22 @@ const registerPacienteSchema = Joi.object({
 
 const loginSchema = Joi.object({
     email: Joi.string().email().required(),
-    senha: Joi.string().required()
+    senha: Joi.string().required(),
+    role: Joi.string().optional()
 });
 
 export async function registrarProfissional(req: Request, res: Response) {
     try {
-        const { nome, email, senha } = req.body;
+        const { nome, email, senha, especialidade } = req.body;
 
-        const { error, value } = registerSchema.validate({ nome, email, senha });
+        const { error, value } = registerSchema.validate({ nome, email, senha, especialidade });
         if (error) {
             return res.status(400).json({
                 error: error.details[0].message
             });
         }
 
-        const user = await authService.registrarProfissional(value.nome, value.email, value.senha);
+        const user = await authService.registrarProfissional(value.nome, value.email, value.senha, value.especialidade);
 
         const master = (req as any).user;
         console.log(`[AUDITORIA] MASTER id=${master?.id} (${master?.email}) registrou profissional: ${value.email}`);
@@ -85,25 +87,25 @@ export async function registrarFuncionario(req: Request, res: Response) {
     }
 }
 
-export async function login(req: Request, res: Response) {
-    try {
-        const { email, senha } = req.body;
-
-        // Validar inputs com Joi
-        const { error, value } = loginSchema.validate({ email, senha });
-        if (error) {
-            return res.status(400).json({
-                error: error.details[0].message
-            });
-        }
-
-        const data = await authService.login(value.email, value.senha);
+    export async function login(req: Request, res: Response) {
+        try {
+            const { email, senha, role } = req.body;
+    
+            // Validar inputs com Joi
+            const { error, value } = loginSchema.validate({ email, senha, role });
+            if (error) {
+                return res.status(400).json({
+                    error: error.details[0].message
+                });
+            }
+    
+            const data = await authService.login(value.email, value.senha, value.role);
 
         // Definir cookies httpOnly
         res.cookie('accessToken', data.accessToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
+            sameSite: 'lax',
             maxAge: 15 * 60 * 1000 // 15 minutos
         });
 
@@ -142,15 +144,16 @@ export async function loginPaciente(req: Request, res: Response) {
 
         res.cookie('accessToken', data.accessToken, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
+            // allow cross-site requests for development
+            sameSite: 'lax',
+            secure: false,
             maxAge: 15 * 60 * 1000 // 15 minutos
         });
 
         res.cookie('refreshToken', data.refreshToken, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
+            sameSite: 'none',
+            secure: false,
             maxAge: 7 * 24 * 60 * 60 * 1000 // 7 dias
         });
 

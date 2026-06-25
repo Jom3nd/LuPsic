@@ -3,14 +3,14 @@ import * as usuarioService from './usuario.service';
 import { AuthRequest } from '../types';
 
 export async function criarUsuario(req: Request, res: Response) {
-    const { nome, email, senha } = req.body;
+    const { nome, email, senha, especialidade } = req.body;
 
     if (!nome || !email || !senha) {
         return res.status(400).json({ error: 'Nome, email e senha são obrigatórios' });
     }
 
     try {
-        const usuario = await usuarioService.criarUsuario({ nome, email, senha });
+        const usuario = await usuarioService.criarUsuario({ nome, email, senha, especialidade });
         return res.status(201).json(usuario);
     } catch (error: any) {
         if (error.code === 'P2002') {
@@ -67,7 +67,7 @@ export async function deletarUsuario(req: AuthRequest, res: Response) {
 export async function atualizarUsuario(req: AuthRequest, res: Response) {
     const id = Number(req.params.id);
     const userId = req.user?.id;
-    const { nome, email, senha } = req.body;
+    const { nome, email, senha, especialidade } = req.body;
 
     if (!userId) {
         return res.status(401).json({ error: 'Usuário não autenticado' });
@@ -78,7 +78,7 @@ export async function atualizarUsuario(req: AuthRequest, res: Response) {
     }
 
     try {
-        const usuario = await usuarioService.atualizarUsuario(id, { nome, email, senha });
+        const usuario = await usuarioService.atualizarUsuario(id, { nome, email, senha, especialidade });
         return res.status(200).json(usuario);
     } catch (error: any) {
         if (error.code === 'P2025') {
@@ -88,5 +88,14 @@ export async function atualizarUsuario(req: AuthRequest, res: Response) {
             return res.status(400).json({ error: 'Email já cadastrado' });
         }
         return res.status(500).json({ error: 'Erro ao atualizar usuário' });
+    }
+}
+
+export async function listarProfissionais(req: Request, res: Response) {
+    try {
+        const profissionais = await usuarioService.listarProfissionais();
+        return res.status(200).json(profissionais);
+    } catch (error) {
+        return res.status(500).json({ error: 'Erro ao buscar profissionais' });
     }
 }
