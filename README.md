@@ -1,6 +1,6 @@
-# Mindful Assistant - Sistema de Gestão Clínica com IA
+# LuPsic - Sistema de Gestão Clínica com IA
 
-O **Mindful Assistant** é uma plataforma robusta desenvolvida para otimizar o fluxo de trabalho de psicólogos e profissionais de saúde mental. O sistema combina gestão de pacientes e sessões com o poder da Inteligência Artificial local para geração de insights clínicos, garantindo a privacidade total dos dados.
+O **LuPsic** é uma plataforma robusta desenvolvida para otimizar o fluxo de trabalho de psicólogos e profissionais de saúde mental. O sistema combina gestão de pacientes e sessões com o poder da Inteligência Artificial local para geração de insights clínicos, garantindo a privacidade total dos dados.
 
 ## 🚀 Principais Funcionalidades
 
@@ -23,20 +23,8 @@ O **Mindful Assistant** é uma plataforma robusta desenvolvida para otimizar o f
 - **Infraestrutura**: Docker & Docker Compose.
 - **Modelos de IA**: Qwen2.5-coder e Llama3 (via Ollama).
 
-## 📦 Como Executar o Projeto
+## Projeto em desenvolvimento
 
-O ambiente é totalmente conteinerizado, facilitando a execução em qualquer máquina:
+Este projeto está sendo desenvolvido para implantação em ambiente real.
 
-1. **Clone o repositório**
-2. **Configure as variáveis de ambiente**:
-   - Crie um arquivo `.env` na pasta `backend` baseando-se no `.env.example`.
-3. **Suba os containers**:
-   ```bash
-   docker-compose up -d --build
-   ```
-4. **Acesse as interfaces**:
-   - Frontend: `http://localhost:80`
-   - Backend API: `http://localhost:3000`
-
----
-*Este é um projeto privado e proprietário.*
+Por questões comerciais, parte da documentação, variáveis de ambiente e configurações de infraestrutura não estão disponíveis publicamente.
