@@ -21,15 +21,50 @@ export const tools = [
 
 import { criarPaciente as criarPacienteService } from "../paciente/paciente.service";
 
+/** Dados necessários para criar paciente via IA */
+interface CriarPacienteData {
+    nome: string;
+    idade: number;
+}
+
+/** Dados necessários para criar sessão via IA */
+interface CriarSessaoData {
+    pacienteId: number;
+    dataTexto: string;
+}
+
+/** Resultado padronizado de execução de tool */
+export interface ToolActionResult {
+    tipo: "acao" | "erro";
+    message?: string;
+    data?: Record<string, unknown>;
+}
+
+/** Ação parseada da IA */
+export interface ParsedAction {
+    action: string;
+    data: Record<string, unknown>;
+}
+
+/** Type guard para CriarPacienteData */
+function isCriarPacienteData(data: Record<string, unknown>): data is CriarPacienteData & Record<string, unknown> {
+    return typeof data.nome === "string" && (typeof data.idade === "number" || typeof data.idade === "string");
+}
+
+/** Type guard para CriarSessaoData */
+function isCriarSessaoData(data: Record<string, unknown>): data is CriarSessaoData & Record<string, unknown> {
+    return (typeof data.pacienteId === "number" || typeof data.pacienteId === "string") && typeof data.dataTexto === "string";
+}
+
 // Funções reais (execução)
-export async function criarPaciente(data: any, userId: number) {
-    if (!data.nome || data.idade == null) { // idade pode ser 0, então verificamos null ou undefined
+export async function criarPaciente(data: Record<string, unknown>, userId: number): Promise<ToolActionResult> {
+    if (!isCriarPacienteData(data)) {
         throw new Error("Dados inválidos para paciente");
     }
 
-    const email = `${data.nome.toLowerCase().replace(/\s+/g, "")}.${Date.now()}@mindful.com`;
+    const email = `${String(data.nome).toLowerCase().replace(/\s+/g, "")}.${Date.now()}@mindful.com`;
     const paciente = await criarPacienteService({
-        nome: data.nome,
+        nome: String(data.nome),
         idade: Number(data.idade),
         email,
     }, userId);
@@ -37,13 +72,12 @@ export async function criarPaciente(data: any, userId: number) {
     return {
         tipo: "acao",
         message: "Paciente criado com sucesso",
-        data: paciente,
+        data: paciente as unknown as Record<string, unknown>,
     };
 }
 
-export async function criarSessao(data: any, userId: number) {
-
-    if (data.pacienteId == null || !data.dataTexto) {
+export async function criarSessao(data: Record<string, unknown>, userId: number): Promise<ToolActionResult> {
+    if (!isCriarSessaoData(data)) {
         throw new Error("Dados inválidos para sessão");
     }
 
@@ -80,7 +114,7 @@ export async function criarSessao(data: any, userId: number) {
     return {
         tipo: "acao",
         message: `Sessão agendada para ${paciente.usuario?.nome || "Paciente"} em ${dataConvertida.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}`,
-        data: sessao
+        data: sessao as unknown as Record<string, unknown>
     };
 }
 
@@ -135,7 +169,7 @@ function converterDataNatural(texto: string): Date {
     const horaMatch = textoLower.match(/(\d{1,2})(?:[:h](\d{2}))?/);
 
     if (horaMatch) {
-        let hora = Number(horaMatch[1]);
+        const hora = Number(horaMatch[1]);
         const minuto = Number(horaMatch[2] || 0);
 
         data.setHours(hora, minuto, 0, 0);
@@ -147,14 +181,17 @@ function converterDataNatural(texto: string): Date {
 }
 
 
+/** Tipo da função de execução de tool */
+type ToolExecutor = (data: Record<string, unknown>, userId: number) => Promise<ToolActionResult>;
+
 // Mapeamento das tools
-export const toolMap: Record<string, Function> = {
+export const toolMap: Record<string, ToolExecutor> = {
     criar_paciente: criarPaciente,
     criar_sessao: criarSessao,
 };
 
 // Validação
-export function validarTool(parsed: any) {
+export function validarTool(parsed: ParsedAction): boolean {
     const tool = tools.find(t => t.name === parsed.action);
 
     if (!tool) {

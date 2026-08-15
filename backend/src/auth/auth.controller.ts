@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import * as authService from "./auth.service";
 import Joi from "joi";
+import { AuthRequest, getErrorMessage } from "../types";
 
 // Schemas de validação
 const registerSchema = Joi.object({
@@ -32,6 +33,26 @@ const loginSchema = Joi.object({
     role: Joi.string().optional()
 });
 
+function getCookieOptions(type: "access" | "refresh") {
+    const isProduction = process.env.NODE_ENV === 'production';
+
+    if (type === "access") {
+        return {
+            httpOnly: true,
+            secure: isProduction,
+            sameSite: 'lax' as const,
+            maxAge: 15 * 60 * 1000 // 15 minutos
+        };
+    }
+
+    return {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: 'lax' as const,
+        maxAge: 7 * 24 * 60 * 60 * 1000 // 7 dias
+    };
+}
+
 export async function registrarProfissional(req: Request, res: Response) {
     try {
         const { nome, email, senha, especialidade } = req.body;
@@ -45,7 +66,7 @@ export async function registrarProfissional(req: Request, res: Response) {
 
         const user = await authService.registrarProfissional(value.nome, value.email, value.senha, value.especialidade);
 
-        const master = (req as any).user;
+        const master = (req as AuthRequest).user;
         console.log(`[AUDITORIA] MASTER id=${master?.id} (${master?.email}) registrou profissional: ${value.email}`);
 
         return res.status(201).json({
@@ -53,9 +74,9 @@ export async function registrarProfissional(req: Request, res: Response) {
             user
         });
 
-    } catch (error) {
-        const message = error instanceof Error ? error.message : "Erro ao registrar profissional";
-        return res.status(400).json({ error: message });
+    } catch (error: unknown) {
+        const message = getErrorMessage(error);
+        return res.status(400).json({ error: message || "Erro ao registrar profissional" });
     }
 }
 
@@ -72,7 +93,7 @@ export async function registrarFuncionario(req: Request, res: Response) {
 
         const user = await authService.registrarFuncionario(value.nome, value.email, value.senha);
 
-        const master = (req as any).user;
+        const master = (req as AuthRequest).user;
         console.log(`[AUDITORIA] MASTER id=${master?.id} (${master?.email}) registrou funcionario: ${value.email}`);
 
         return res.status(201).json({
@@ -80,51 +101,40 @@ export async function registrarFuncionario(req: Request, res: Response) {
             user
         });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         return res.status(400).json({
-            error: error.message || "Erro ao registrar funcionário"
+            error: getErrorMessage(error) || "Erro ao registrar funcionário"
         });
     }
 }
 
-    export async function login(req: Request, res: Response) {
-        try {
-            const { email, senha, role } = req.body;
-    
-            // Validar inputs com Joi
-            const { error, value } = loginSchema.validate({ email, senha, role });
-            if (error) {
-                return res.status(400).json({
-                    error: error.details[0].message
-                });
-            }
-    
-            const data = await authService.login(value.email, value.senha, value.role);
+export async function login(req: Request, res: Response) {
+    try {
+        const { email, senha, role } = req.body;
+
+        // Validar inputs com Joi
+        const { error, value } = loginSchema.validate({ email, senha, role });
+        if (error) {
+            return res.status(400).json({
+                error: error.details[0].message
+            });
+        }
+
+        const data = await authService.login(value.email, value.senha, value.role);
 
         // Definir cookies httpOnly
-        res.cookie('accessToken', data.accessToken, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            maxAge: 15 * 60 * 1000 // 15 minutos
-        });
-
-        res.cookie('refreshToken', data.refreshToken, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
-            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 dias
-        });
+        res.cookie('accessToken', data.accessToken, getCookieOptions("access"));
+        res.cookie('refreshToken', data.refreshToken, getCookieOptions("refresh"));
 
         return res.json({
             message: 'Autenticado com sucesso',
             user: data.user
         });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Erro no login:", error);
         return res.status(400).json({
-            error: error.message || "Email ou senha incorretos"
+            error: getErrorMessage(error) || "Email ou senha incorretos"
         });
     }
 }
@@ -142,30 +152,18 @@ export async function loginPaciente(req: Request, res: Response) {
 
         const data = await authService.loginPaciente(value.email, value.senha);
 
-        res.cookie('accessToken', data.accessToken, {
-            httpOnly: true,
-            // allow cross-site requests for development
-            sameSite: 'lax',
-            secure: false,
-            maxAge: 15 * 60 * 1000 // 15 minutos
-        });
-
-        res.cookie('refreshToken', data.refreshToken, {
-            httpOnly: true,
-            sameSite: 'none',
-            secure: false,
-            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 dias
-        });
+        res.cookie('accessToken', data.accessToken, getCookieOptions("access"));
+        res.cookie('refreshToken', data.refreshToken, getCookieOptions("refresh"));
 
         return res.json({
             message: 'Autenticado com sucesso',
             user: data.user
         });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Erro no login de paciente:", error);
         return res.status(400).json({
-            error: error.message || "Email ou senha incorretos"
+            error: getErrorMessage(error) || "Email ou senha incorretos"
         });
     }
 }
@@ -186,18 +184,13 @@ export async function refreshToken(req: Request, res: Response) {
         const data = await authService.refreshAccessToken(refreshToken);
 
         // Atualizar o cookie do access token
-        res.cookie('accessToken', data.accessToken, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
-            maxAge: 15 * 60 * 1000 // 15 minutos
-        });
+        res.cookie('accessToken', data.accessToken, getCookieOptions("access"));
 
         return res.json({
             message: 'Token renovado com sucesso'
         });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         return res.status(401).json({
             error: "Falha ao renovar token"
         });
@@ -215,16 +208,16 @@ export async function registrarPaciente(req: Request, res: Response) {
             });
         }
 
-        const paciente = await authService.registrarPaciente(value.nome,value.idade, value.email, value.senha);
+        const paciente = await authService.registrarPaciente(value.nome, value.idade, value.email, value.senha);
 
         return res.status(201).json({
             message: "Paciente registrado com sucesso",
             paciente
         });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         return res.status(400).json({
-            error: error.message || "Erro ao registrar paciente"
+            error: getErrorMessage(error) || "Erro ao registrar paciente"
         });
     }
 }
@@ -248,7 +241,7 @@ export async function logout(req: Request, res: Response) {
             message: 'Logout realizado com sucesso'
         });
 
-    } catch (error: any) {
+    } catch {
         res.clearCookie('accessToken');
         res.clearCookie('refreshToken');
         

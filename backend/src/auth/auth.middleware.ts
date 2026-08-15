@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from "express";
+import { Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { AuthRequest, TokenPayload } from "../types";
 
@@ -7,7 +7,7 @@ export function autenticarToken(req: AuthRequest, res: Response, next: NextFunct
 
     // Verificar token em cookie (prioridade)
     if (req.cookies?.accessToken) {
-        token = req.cookies.accessToken;
+        token = req.cookies.accessToken as string;
     }
     // Fallback para header Authorization
     else if (req.headers.authorization) {
@@ -16,7 +16,8 @@ export function autenticarToken(req: AuthRequest, res: Response, next: NextFunct
     }
 
     if (!token) {
-        return res.status(401).json({ error: "Token não enviado" });
+        res.status(401).json({ error: "Token não enviado" });
+        return;
     }
 
     try {
@@ -26,20 +27,22 @@ export function autenticarToken(req: AuthRequest, res: Response, next: NextFunct
 
         req.user = decode;
 
-        return next();
-    } catch (error) {
-        return res.status(401).json({ error: "Token inválido" });
+        next();
+    } catch {
+        res.status(401).json({ error: "Token inválido" });
     }
 }
 
 export function requireMaster(req: AuthRequest, res: Response, next: NextFunction) {
     if (!req.user) {
-        return res.status(401).json({ error: "Usuário não autenticado" });
+        res.status(401).json({ error: "Usuário não autenticado" });
+        return;
     }
 
     if (req.user.role !== "MASTER") {
-        return res.status(403).json({ error: "Acesso negado." });
+        res.status(403).json({ error: "Acesso negado." });
+        return;
     }
 
-    return next();
+    next();
 }

@@ -1,8 +1,36 @@
 import { chamarOllamaComIA } from "./ollama.client";
 import { tools, toolMap, validarTool } from "./ai.tools";
 import prisma from "../lib/prisma";
+import type { ToolActionResult, ParsedAction } from "./ai.tools";
 
-function gerarPromptInterpretacao(mensagem: string, pacientes: any[], dataAtual: string) {
+/** Contexto de paciente para a IA */
+interface PacienteContexto {
+    id: number;
+    name: string;
+}
+
+/** Resultado do processamento da IA */
+interface IAProcessResult {
+    tipo: "resposta" | "acao" | "erro";
+    conteudo?: string;
+    data?: IAActionItem[];
+    message?: string;
+}
+
+/** Item de ação retornado pela IA */
+interface IAActionItem {
+    action: string;
+    data: Record<string, unknown>;
+}
+
+/** Formato esperado do JSON da IA */
+interface IAActionsResponse {
+    actions?: IAActionItem[];
+    action?: string;
+    data?: Record<string, unknown>;
+}
+
+function gerarPromptInterpretacao(mensagem: string, pacientes: PacienteContexto[], dataAtual: string): string {
     const listaPacientes = pacientes.map(p => `- ID: ${p.id}, Nome: ${p.name}`).join("\n");
 
     return `
@@ -38,12 +66,12 @@ Mensagem do Usuário: ${mensagem}
 }
 
 
-async function interpretarComQwen(mensagem: string, pacientes: any[], dataAtual: string) {
+async function interpretarComQwen(mensagem: string, pacientes: PacienteContexto[], dataAtual: string): Promise<string> {
     const prompt = gerarPromptInterpretacao(mensagem, pacientes, dataAtual);
-    return await chamarOllamaComIA("qwen2.5-coder:7b", prompt);
+    return await chamarOllamaComIA("qwen2.5:4b", prompt);
 }
 
-async function responderComLlama(mensagem: string) {
+async function responderComQwenChat(mensagem: string): Promise<string> {
     const prompt = `
 Você é um assistente clínico para psicólogos.
 
@@ -53,10 +81,10 @@ Mensagem:
 ${mensagem}
 `;
 
-    return await chamarOllamaComIA("llama3", prompt);
+    return await chamarOllamaComIA("qwen2.5:4b-chat", prompt);
 }
 
-async function executarAcao(parsed: any, userId: number) {
+async function executarAcao(parsed: ParsedAction, userId: number): Promise<ToolActionResult> {
     if (!validarTool(parsed)) {
         return {
             tipo: "erro",
@@ -92,15 +120,15 @@ async function executarAcao(parsed: any, userId: number) {
 
     try {
         return await action(parsed.data, userId);
-    } catch (error: any) {
+    } catch (error: unknown) {
         return {
             tipo: "erro",
-            message: error.message || "Erro ao executar ação",
+            message: error instanceof Error ? error.message : "Erro ao executar ação",
         };
     }
 }
 
-export async function processarIA(mensagem: string, userId: number) {
+export async function processarIA(mensagem: string, userId: number): Promise<IAProcessResult> {
     // Buscar pacientes do profissional para dar contexto à IA
     const pacientesRaw = await prisma.paciente.findMany({
         where: { profissionalId: userId },
@@ -111,7 +139,7 @@ export async function processarIA(mensagem: string, userId: number) {
         }
     });
 
-    const pacientes = pacientesRaw.map(p => ({
+    const pacientes: PacienteContexto[] = pacientesRaw.map(p => ({
         id: p.id,
         name: p.usuario?.nome || "Sem Nome"
     }));
@@ -120,7 +148,7 @@ export async function processarIA(mensagem: string, userId: number) {
 
     const interpretacao = await interpretarComQwen(mensagem, pacientes, dataAtual);
 
-    let parsed;
+    let parsed: IAActionsResponse;
 
     try {
         // Garantir que é string antes de limpar
@@ -131,10 +159,10 @@ export async function processarIA(mensagem: string, userId: number) {
             .replace(/```/g, "")
             .trim();
 
-        parsed = JSON.parse(clean);
+        parsed = JSON.parse(clean) as IAActionsResponse;
     } catch (error) {
         console.error("Erro ao processar JSON da IA:", error);
-        const resposta = await responderComLlama(mensagem);
+        const resposta = await responderComQwenChat(mensagem);
 
         return {
             tipo: "resposta",
@@ -143,15 +171,15 @@ export async function processarIA(mensagem: string, userId: number) {
     }
 
     // Se não houver array de ações, tenta converter formato antigo para o novo
-    const actions = parsed.actions || (parsed.action ? [parsed] : []);
+    const actions: IAActionItem[] = parsed.actions || (parsed.action ? [parsed as unknown as IAActionItem] : []);
 
     if (actions.length === 0 || (actions.length === 1 && actions[0].action === "responder")) {
-        const resposta = await responderComLlama(mensagem);
+        const resposta = await responderComQwenChat(mensagem);
         return { tipo: "resposta", conteudo: resposta };
     }
 
-    const resultados = [];
-    let ultimoPacienteCriadoId = null;
+    const resultados: string[] = [];
+    let ultimoPacienteCriadoId: number | null = null;
 
     for (const item of actions) {
         // Se for criar sessão e o pacienteId for 0 (indicando que acabou de ser criado no mesmo comando)
@@ -159,13 +187,13 @@ export async function processarIA(mensagem: string, userId: number) {
             item.data.pacienteId = ultimoPacienteCriadoId;
         }
 
-        const resultado = await executarAcao(item, userId);
+        const resultado = await executarAcao(item as ParsedAction, userId);
         
         if (resultado.tipo !== "erro") {
-            resultados.push(resultado.message);
+            resultados.push(resultado.message || "Ação executada");
             // Salva o ID se um paciente foi criado para usar na próxima ação do loop
-            if (item.action === "criar_paciente" && resultado.data?.id) {
-                ultimoPacienteCriadoId = resultado.data.id;
+            if (item.action === "criar_paciente" && resultado.data && typeof resultado.data === "object" && "id" in resultado.data) {
+                ultimoPacienteCriadoId = (resultado.data as { id: number }).id;
             }
         } else {
             resultados.push(`Erro em ${item.action}: ${resultado.message}`);
@@ -177,4 +205,4 @@ export async function processarIA(mensagem: string, userId: number) {
         conteudo: resultados.join(" | "),
         data: actions
     };
-}
+}

@@ -21,7 +21,7 @@ O **LuPsic** é uma plataforma robusta desenvolvida para otimizar o fluxo de tra
 - **Frontend**: React, Vite, TypeScript, Tailwind CSS.
 - **Banco de Dados**: PostgreSQL com Prisma ORM.
 - **Infraestrutura**: Docker & Docker Compose.
-- **Modelos de IA**: Qwen2.5-coder e Llama3 (via Ollama).
+- **Modelos de IA**: Qwen2.5:4b (via Ollama).
 
 ## Projeto em desenvolvimento
 

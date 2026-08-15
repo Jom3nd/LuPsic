@@ -1,9 +1,23 @@
 import axios from "axios";
 
+/** Resultado parseado da IA com ações válidas */
+interface IAActionsParsed {
+    actions?: IAAction[];
+    action?: string;
+    data?: Record<string, unknown>;
+}
+
+interface IAAction {
+    action: string;
+    data: Record<string, unknown>;
+}
+
+const ACTIONS_PERMITIDAS = ["criar_paciente", "criar_sessao", "responder"] as const;
+
 export async function chamarOllamaComIA(
     model: string,
     userInput: string
-) {
+): Promise<string> {
     let systemPrompt = "";
 
     switch (model) {
@@ -11,7 +25,7 @@ export async function chamarOllamaComIA(
         // =========================
         // INTERPRETADOR DE COMANDOS
         // =========================
-        case "qwen2.5-coder:7b":
+        case "qwen2.5:4b":
             systemPrompt = `
 Você é um roteador de intenções clínicas.
 Retorne SOMENTE JSON válido.
@@ -47,7 +61,7 @@ Use APENAS a mensagem atual. Nunca explique. Nunca use markdown. Responda em uma
         // =========================
         // ASSISTENTE CLÍNICO
         // =========================
-        case "llama3":
+        case "qwen2.5:4b-chat":
             systemPrompt = `
 Você é um assistente clínico para psicólogos.
 
@@ -79,7 +93,7 @@ MENSAGEM ATUAL:
     // =========================
     // QWEN COM VALIDATOR LOOP
     // =========================
-    if (model === "qwen2.5-coder:7b") {
+    if (model === "qwen2.5:4b") {
         try {
             return await interpretarComRetry(promptFinal, model);
         } catch (error) {
@@ -106,8 +120,8 @@ MENSAGEM ATUAL:
 // ======================================================
 const OLLAMA_URL = process.env.OLLAMA_URL || "http://localhost:11434";
 
-async function gerar(model: string, prompt: string) {
-    const response = await axios.post(
+async function gerar(model: string, prompt: string): Promise<string> {
+    const response = await axios.post<{ response: string }>(
         `${OLLAMA_URL}/api/generate`,
 
         {
@@ -130,7 +144,7 @@ async function gerar(model: string, prompt: string) {
 async function interpretarComRetry(
     prompt: string,
     model: string
-) {
+): Promise<string> {
     // 1 tentativa
     let resposta = await gerar(model, prompt);
 
@@ -170,20 +184,18 @@ ${resposta}
 // ======================================================
 // PARSE SEGURO
 // ======================================================
-function tentarParse(texto: string) {
+function tentarParse(texto: string): IAActionsParsed | null {
     try {
         const jsonLimpo = limparJSON(texto);
-        const parsed = JSON.parse(jsonLimpo);
+        const parsed = JSON.parse(jsonLimpo) as IAActionsParsed;
 
         // Suporta tanto o novo formato "actions" quanto o antigo "action"
-        const actions = parsed.actions || (parsed.action ? [parsed] : null);
+        const actions = parsed.actions || (parsed.action ? [parsed as unknown as IAAction] : null);
 
         if (!actions || !Array.isArray(actions) || actions.length === 0) return null;
 
-        const actionsPermitidas = ["criar_paciente", "criar_sessao", "responder"];
-
         for (const item of actions) {
-            if (!item.action || !actionsPermitidas.includes(item.action)) {
+            if (!item.action || !(ACTIONS_PERMITIDAS as readonly string[]).includes(item.action)) {
                 return null;
             }
         }

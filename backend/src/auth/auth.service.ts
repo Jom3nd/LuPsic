@@ -22,6 +22,45 @@ function validatePasswordStrength(password: string): void {
     }
 }
 
+function getJwtSecret(): string {
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+        throw new Error('JWT_SECRET não definido no .env');
+    }
+    return secret;
+}
+
+function gerarTokens(payload: TokenPayload): { accessToken: string; refreshToken: string } {
+    const secret = getJwtSecret();
+
+    const accessToken = jwt.sign(
+        { id: payload.id, email: payload.email, role: payload.role },
+        secret,
+        { expiresIn: "15m" }
+    );
+
+    const refreshToken = jwt.sign(
+        { id: payload.id, email: payload.email, role: payload.role },
+        secret,
+        { expiresIn: "7d" }
+    );
+
+    return { accessToken, refreshToken };
+}
+
+async function salvarRefreshToken(token: string, usuarioId: number): Promise<void> {
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+
+    await prisma.refreshToken.create({
+        data: {
+            token,
+            usuarioId,
+            expiresAt
+        }
+    });
+}
+
 export async function registrarProfissional(nome: string, email: string, senha: string, especialidade?: string) {
     const cleanEmail = email.toLowerCase().trim();
 
@@ -126,7 +165,7 @@ export async function registrarPaciente(nome: string, idade: number, email: stri
     });
 }
 
-export async function login(email: string, senha: string, expectedRole?: string){
+export async function login(email: string, senha: string, expectedRole?: Role) {
     const cleanEmail = email.trim();
     const usuario = await prisma.usuario.findFirst({
         where : {
@@ -158,40 +197,15 @@ export async function login(email: string, senha: string, expectedRole?: string)
         throw new Error('Email ou senha incorretos');
     }
 
-    if (!process.env.JWT_SECRET) {
-        throw new Error('JWT_SECRET não definido no .env');
-    }
+    const tokenPayload: TokenPayload = {
+        id: usuario.id,
+        email: usuario.email,
+        role: usuario.role
+    };
 
-    const accessToken = jwt.sign(
-        {
-            id : usuario.id,
-            email : usuario.email,
-            role: usuario.role
-        },
-        process.env.JWT_SECRET as string,
-        { expiresIn: "15m" }
-    );
+    const { accessToken, refreshToken } = gerarTokens(tokenPayload);
 
-    const refreshToken = jwt.sign(
-        {
-            id : usuario.id,
-            email : usuario.email,
-            role: usuario.role
-        },
-        process.env.JWT_SECRET as string,
-        { expiresIn: "7d" }
-    );
-
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7);
-
-    await prisma.refreshToken.create({
-        data: {
-            token: refreshToken,
-            usuarioId: usuario.id,
-            expiresAt
-        }
-    });
+    await salvarRefreshToken(refreshToken, usuario.id);
 
     return {
         accessToken,
@@ -205,7 +219,7 @@ export async function login(email: string, senha: string, expectedRole?: string)
     };
 }
 
-export async function loginPaciente(email: string, senha: string){
+export async function loginPaciente(email: string, senha: string) {
     const cleanEmail = email.trim();
     const usuarioPaciente = await prisma.usuario.findFirst({
         where : {
@@ -243,29 +257,16 @@ export async function loginPaciente(email: string, senha: string){
         throw new Error('Email ou senha incorretos');
     }
 
-    if (!process.env.JWT_SECRET) {
-        throw new Error('JWT_SECRET não definido no .env');
-    }
+    const tokenPayload: TokenPayload = {
+        id: usuarioPaciente.id,
+        email: usuarioPaciente.email,
+        role: "PACIENTE"
+    };
 
-    const accessToken = jwt.sign(
-        {
-            id : usuarioPaciente.id,
-            email : usuarioPaciente.email,
-            role: "PACIENTE"
-        },
-        process.env.JWT_SECRET as string,
-        { expiresIn: "15m" }
-    );
+    const { accessToken, refreshToken } = gerarTokens(tokenPayload);
 
-    const refreshToken = jwt.sign(
-        {
-            id : usuarioPaciente.id,
-            email : usuarioPaciente.email,
-            role: "PACIENTE"
-        },
-        process.env.JWT_SECRET as string,
-        { expiresIn: "7d" }
-    );
+    // Persistir o refresh token no banco (bug corrigido: antes não era salvo)
+    await salvarRefreshToken(refreshToken, usuarioPaciente.id);
 
     return {
         accessToken,
@@ -275,18 +276,16 @@ export async function loginPaciente(email: string, senha: string){
             usuarioId: usuarioPaciente.id,   // ID de autenticação
             nome: usuarioPaciente.nome,
             email: usuarioPaciente.email,
-            role: "PACIENTE"
+            role: "PACIENTE" as const
         }
     };
 }
 
 export async function refreshAccessToken(refreshToken: string) {
-    if (!process.env.JWT_SECRET) {
-        throw new Error('JWT_SECRET não definido no .env');
-    }
+    const secret = getJwtSecret();
 
     try {
-        const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET as string) as TokenPayload;
+        const decoded = jwt.verify(refreshToken, secret) as TokenPayload;
         
         const storedToken = await prisma.refreshToken.findUnique({
             where: { token: refreshToken }
@@ -302,7 +301,7 @@ export async function refreshAccessToken(refreshToken: string) {
                 email: decoded.email,
                 role: decoded.role
             },
-            process.env.JWT_SECRET as string,
+            secret,
             { expiresIn: "15m" }
         );
 
@@ -310,7 +309,7 @@ export async function refreshAccessToken(refreshToken: string) {
             accessToken: newAccessToken,
             refreshToken
         };
-    } catch (error) {
+    } catch {
         throw new Error('Falha ao renovar token');
     }
 }
